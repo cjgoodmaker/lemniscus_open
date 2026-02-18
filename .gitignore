@@ -19,6 +19,8 @@ _hf_cache/
 data/*
 !data/.gitkeep
 lemniscus.db
+lemniscus.db-shm
+lemniscus.db-wal
 .indexed_files.json
 
 # Auth (user credentials)

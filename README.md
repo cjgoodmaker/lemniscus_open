@@ -1,87 +1,108 @@
 # Lemniscus Bantom
 
-MCP-only health data server for Claude Code power users. No UI, no HTTP server — just drop your health files in `data/` and query them through Claude.
+MCP-only health data server for Claude Code. No UI, no HTTP server — just drop your health files in `data/` and query them through Claude.
+
+## Prerequisites
+
+- **macOS** (Apple Silicon or Intel)
+- **Python 3.11+** — check with `python3 --version`. If missing: `brew install python@3.12`
+- **Claude Code** — install from https://docs.anthropic.com/en/docs/claude-code
 
 ## Quick Start
 
+### 1. Clone and run setup
+
 ```bash
-# 1. Clone and setup
-git clone <repo-url>
+git clone https://github.com/cjgoodmaker/lemniscus_server_bantom.git
 cd lemniscus_server_bantom
 bash setup.sh
-
-# 2. Create an account (or login if you already have one)
-.venv/bin/python server.py signup
-# or
-.venv/bin/python server.py login
-
-# 3. Add your health data
-cp ~/path/to/export.xml data/
-cp ~/path/to/bloodwork.pdf data/
-
-# 4. Open Claude Code in this directory — done!
-cd ~/path/to/lemniscus_server_bantom
-claude
-#    The MCP server starts automatically via .mcp.json
 ```
 
-## Requirements
+This creates a virtual environment, installs dependencies, and downloads the AI embedding model (~90MB).
 
-- Python 3.11+
-- ~300MB disk space (model + dependencies)
+### 2. Create your account
+
+```bash
+.venv/bin/python server.py signup
+```
+
+Enter your email and password. You'll receive a confirmation email — click the link, then sign in:
+
+```bash
+.venv/bin/python server.py login
+```
+
+### 3. Add your health data
+
+Copy your health files into the `data/` folder:
+
+```bash
+# Apple Health export (from iPhone: Health app → Profile → Export All Health Data)
+cp ~/Downloads/export.xml data/
+
+# Lab reports, medical records
+cp ~/Documents/bloodwork.pdf data/
+
+# Wearable exports
+cp ~/Downloads/oura_export.json data/
+
+# Clinical photos, notes, etc.
+cp ~/Pictures/mole_check.jpg data/
+cp ~/Documents/health_notes.txt data/
+```
+
+### 4. Index your data
+
+```bash
+.venv/bin/python server.py index
+```
+
+You'll see progress in the terminal as each file is parsed and embedded. Large Apple Health exports (~600MB XML) take about 2 minutes.
+
+### 5. Start Claude Code
+
+```bash
+claude
+```
+
+That's it. The MCP server starts automatically (configured via `.mcp.json` in this directory). Ask Claude anything about your health data:
+
+- "What were my heart rate trends last month?"
+- "Summarize my lab results"
+- "How was my sleep in January?"
+- "How many steps did I average per day in 2024?"
 
 ## CLI Commands
 
+All commands are run from the `lemniscus_server_bantom` directory:
+
 | Command | Description |
 |---------|-------------|
-| `python server.py signup` | Create a new account |
-| `python server.py login` | Sign in with existing account |
-| `python server.py logout` | Remove stored credentials |
-| `python server.py status` | Show auth status and indexed file count |
-| `python server.py` | Start MCP stdio server (used by Claude Code automatically) |
+| `.venv/bin/python server.py signup` | Create a new account |
+| `.venv/bin/python server.py login` | Sign in with existing account |
+| `.venv/bin/python server.py index` | Index files in `data/` with visible progress |
+| `.venv/bin/python server.py status` | Show auth status and what's been indexed |
+| `.venv/bin/python server.py logout` | Remove stored credentials |
 
 ## Supported File Types
 
 | Type | Extension | Description |
 |------|-----------|-------------|
-| Apple Health | `.xml` | Export from iPhone Health app (auto-aggregates daily) |
+| Apple Health | `.xml` | iPhone Health export (auto-aggregates 1M+ readings into daily summaries) |
 | Oura | `.json` | Oura Ring export (detected by filename or content) |
 | Garmin | `.json` | Garmin Connect export (detected by filename or content) |
 | PDF | `.pdf` | Lab reports, medical records (text extracted per page) |
 | Images | `.png` `.jpg` `.jpeg` `.heic` | Clinical photos, screenshots |
 | Text | `.txt` `.md` `.csv` | Notes, logs, any text content |
-| JSON | `.json` | Generic health data (auto-detects provider) |
-
-## MCP Tools
-
-Once connected, Claude Code has access to these tools:
-
-| Tool | Description |
-|------|-------------|
-| `retrieve_health_context` | Semantic search over all health data and documents |
-| `browse_timeline` | Browse entries chronologically by date range |
-| `query_health_readings` | Drill down into individual sensor readings |
-| `list_sources` | List indexed data sources with record counts |
-| `get_vault_file` | Get original file content (images, text) |
-| `reindex` | Re-scan `data/` for new files without restarting |
-
-## Example Queries
-
-Once configured, ask Claude things like:
-
-- "What were my heart rate trends last month?"
-- "Summarize my sleep data from January"
-- "What did my blood work lab results show?"
-- "How many steps did I average per day in 2024?"
-- "Show me my resting heart rate over time"
+| JSON | `.json` | Generic health data (auto-detects provider format) |
 
 ## Adding Files Mid-Session
 
-You can drop new files into `data/` while Claude Code is running. Then ask Claude to "reindex my health data" — it will call the `reindex` tool to pick up new files without restarting.
+Drop new files into `data/` while Claude Code is running, then ask Claude to "reindex my health data" — it picks up new files without restarting.
 
 ## Using From Another Project
 
-To access your health data from a different project, add this to that project's `.mcp.json`:
+To access your health data from any other project directory, add this to that project's `.mcp.json` (replace the path with your actual install location):
 
 ```json
 {
@@ -98,7 +119,6 @@ To access your health data from a different project, add this to that project's 
 
 1. On startup, the server authenticates with your stored credentials
 2. It scans `data/` and indexes any new or modified files
-3. Files are parsed, chunked into segments, embedded (384-dim MiniLM vectors), and stored in SQLite
-4. A `.indexed_files.json` manifest tracks what's been indexed — subsequent startups skip already-indexed files
-5. The MCP server runs on stdio, responding to Claude Code's tool calls
-6. Search combines semantic (vector) + keyword (FTS5) matching with temporal decay
+3. Files are parsed, chunked, embedded (384-dim MiniLM vectors), and stored in SQLite
+4. Search combines semantic (vector) + keyword (FTS5) matching with temporal decay
+5. The MCP server communicates with Claude Code via stdio — all data stays local on your machine
