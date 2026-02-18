@@ -183,6 +183,69 @@ class Database:
         rows = self.conn.execute(query, params).fetchall()
         return [dict(r) for r in rows]
 
+    def aggregate_raw_readings(
+        self,
+        source_id: str,
+        period: str = "month",
+        year: int | None = None,
+        metric: str | None = None,
+    ) -> list[dict]:
+        """Aggregate raw readings by period (month or year).
+
+        Returns rows with: short_name, record_type, unit, period,
+        reading_count, avg_value, min_value, max_value, total_value.
+        """
+        fmt = "%Y-%m" if period == "month" else "%Y"
+        query = f"""
+            SELECT
+                short_name,
+                record_type,
+                unit,
+                strftime('{fmt}', timestamp) AS period,
+                COUNT(*) AS reading_count,
+                ROUND(AVG(value), 2) AS avg_value,
+                ROUND(MIN(value), 2) AS min_value,
+                ROUND(MAX(value), 2) AS max_value,
+                ROUND(SUM(value), 2) AS total_value
+            FROM raw_readings
+            WHERE source_id = ?
+        """
+        params: list = [source_id]
+
+        if year is not None:
+            query += " AND strftime('%Y', timestamp) = ?"
+            params.append(str(year))
+
+        if metric:
+            query += " AND (short_name LIKE ? OR record_type LIKE ?)"
+            params.extend([f"%{metric}%", f"%{metric}%"])
+
+        query += f"""
+            GROUP BY short_name, record_type, unit, strftime('{fmt}', timestamp)
+            ORDER BY period DESC, short_name
+        """
+        rows = self.conn.execute(query, params).fetchall()
+        return [dict(r) for r in rows]
+
+    def count_timeline_by_modality(
+        self,
+        source_id: str,
+        start: str | None = None,
+        end: str | None = None,
+    ) -> list[dict]:
+        """Count timeline entries grouped by modality for a date range."""
+        query = "SELECT modality, COUNT(*) as count FROM timeline_entries WHERE source_id = ?"
+        params: list = [source_id]
+        if start:
+            query += " AND timestamp >= ?"
+            params.append(start)
+        if end:
+            query += " AND timestamp <= ?"
+            params.append(end)
+        query += " GROUP BY modality ORDER BY count DESC"
+        rows = self.conn.execute(query, params).fetchall()
+        return [dict(r) for r in rows]
+
     # --- Timeline operations ---
 
     def insert_timeline_entry(self, entry: TimelineEntry) -> None:

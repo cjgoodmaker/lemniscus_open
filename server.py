@@ -214,25 +214,107 @@ def create_server(db, embedder, data_dir: str) -> Any:
         return json.dumps(result, default=str)
 
     @mcp.tool()
+    def get_health_summary(
+        period: str = "month",
+        year: int | None = None,
+        metric: str | None = None,
+        source_id: str = SOURCE_ID,
+    ) -> str:
+        """Pre-aggregated health statistics grouped by month or year.
+
+        Returns avg/min/max/total for each metric — no individual readings.
+        Best for broad questions about trends, yearly overviews, or comparing
+        metrics over time. Claude can then drill into specific dates with
+        browse_timeline or query_health_readings.
+
+        Args:
+            period: Grouping period — 'month' or 'year' (default: 'month')
+            year: Optional year filter (e.g. 2024). Omit for all years.
+            metric: Optional metric filter — matches short_name or record_type (e.g. 'Heart Rate', 'steps', 'HRV'). Omit for all metrics.
+            source_id: Data source identifier (default: 'local')
+        """
+        if period not in ("month", "year"):
+            period = "month"
+
+        rows = db.aggregate_raw_readings(
+            source_id=source_id,
+            period=period,
+            year=year,
+            metric=metric,
+        )
+
+        # Group flat rows into {metric: {info, periods: [...]}} structure
+        metrics: dict[str, dict] = {}
+        for row in rows:
+            key = row["short_name"]
+            if key not in metrics:
+                metrics[key] = {
+                    "short_name": row["short_name"],
+                    "record_type": row["record_type"],
+                    "unit": row["unit"],
+                    "periods": [],
+                }
+            metrics[key]["periods"].append({
+                "period": row["period"],
+                "avg": row["avg_value"],
+                "min": row["min_value"],
+                "max": row["max_value"],
+                "total": row["total_value"],
+                "count": row["reading_count"],
+            })
+
+        # Date range
+        date_range = db.conn.execute(
+            "SELECT MIN(timestamp) as earliest, MAX(timestamp) as latest FROM raw_readings WHERE source_id = ?",
+            (source_id,),
+        ).fetchone()
+
+        result = {
+            "period_type": period,
+            "metrics": list(metrics.values()),
+            "total_metrics": len(metrics),
+            "date_range": {
+                "earliest": date_range["earliest"] if date_range else None,
+                "latest": date_range["latest"] if date_range else None,
+            },
+        }
+        return json.dumps(result, default=str)
+
+    @mcp.tool()
     def browse_timeline(
         start: str | None = None,
         end: str | None = None,
         modality: str | None = None,
         limit: int = 50,
+        count_only: bool = False,
         source_id: str = SOURCE_ID,
     ) -> str:
-        """Browse health and document timeline entries in chronological order.
+        """Chronological daily summaries of health data and documents.
 
-        Use this for chronological exploration rather than semantic search.
-        Includes all content types: health data, PDF pages, photos, text files.
+        Best for exploring what happened in a specific date range. Use
+        count_only=true first to check how many entries exist before fetching.
 
         Args:
             start: Start of time range (ISO 8601, e.g. '2024-01-01T00:00:00')
             end: End of time range (ISO 8601)
             modality: Filter by: vitals, activity, sleep, body, nutrition, fitness, mindfulness, workout, other (documents/photos)
             limit: Maximum entries to return (1-500)
+            count_only: If true, return only counts by modality — no entries. Use to check scope before fetching.
             source_id: Data source identifier (default: 'local')
         """
+        if count_only:
+            counts = db.count_timeline_by_modality(
+                source_id=source_id,
+                start=start,
+                end=end,
+            )
+            counts_dict = {r["modality"]: r["count"] for r in counts}
+            return json.dumps({
+                "source_id": source_id,
+                "counts": counts_dict,
+                "total": sum(counts_dict.values()),
+            }, default=str)
+
         start_dt = datetime.fromisoformat(start) if start else None
         end_dt = datetime.fromisoformat(end) if end else None
         limit = max(1, min(limit, 500))
@@ -269,11 +351,12 @@ def create_server(db, embedder, data_dir: str) -> Any:
         limit: int = 100,
         source_id: str = SOURCE_ID,
     ) -> str:
-        """Query individual health readings for detailed drill-down.
+        """Individual sensor readings — the most granular level.
 
-        Use this when you need specific data points (e.g., individual heart rate
-        readings, specific step counts). For broader questions, use
-        retrieve_health_context instead.
+        Returns raw data points (e.g., every heart rate reading, every step
+        count). Best for detailed drill-down into specific dates or metrics
+        after identifying what to look at via get_health_summary or
+        browse_timeline.
 
         Args:
             record_type: HK type to filter (e.g. 'HKQuantityTypeIdentifierHeartRate')
