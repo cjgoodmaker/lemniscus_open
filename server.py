@@ -142,15 +142,16 @@ def _scan_and_index(db, embedder) -> dict:
                     embedder=embedder,
                     filename=file_path.name,
                 )
+            records_count = result.get("records_ingested", 0)
             manifest[rel] = {
                 "size": stat.st_size,
                 "mtime": stat.st_mtime,
                 "source_type": source_type,
-                "records": result.get("records_stored", 0),
+                "records": records_count,
                 "indexed_at": datetime.now().isoformat(),
             }
             indexed += 1
-            logger.info(f"  -> {result.get('records_stored', 0)} records")
+            logger.info(f"  -> {records_count} records")
         except Exception as e:
             logger.error(f"  -> Failed: {e}")
             errors.append({"file": rel, "error": str(e)})
