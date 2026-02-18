@@ -20,7 +20,7 @@ cp ~/path/to/export.xml data/
 cp ~/path/to/bloodwork.pdf data/
 
 # 4. Open Claude Code in this directory — done!
-cd ~/Developer/lemniscus_server_bantom
+cd ~/path/to/lemniscus_server_bantom
 claude
 #    The MCP server starts automatically via .mcp.json
 ```
