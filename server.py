@@ -2,6 +2,7 @@
 
 Usage:
     python server.py              Run MCP stdio server (requires auth)
+    python server.py index        Index files in data/ (visible progress)
     python server.py login        Sign in with email/password
     python server.py signup       Create a new account
     python server.py logout       Remove stored credentials
@@ -395,6 +396,64 @@ def create_server(db, embedder, data_dir: str) -> Any:
         result = _scan_and_index(db, embedder)
         return json.dumps(result, default=str)
 
+    @mcp.tool()
+    def index_status() -> str:
+        """Show what health data has been indexed and is available for search.
+
+        Returns a summary of indexed files, record counts by type, and date
+        ranges. Use this to confirm data was ingested correctly or to see
+        what's available before searching.
+        """
+        manifest = _load_manifest()
+
+        # DB-level stats
+        sources = db.conn.execute("""
+            SELECT source_type, COUNT(*) as record_count,
+                   MIN(timestamp) as earliest, MAX(timestamp) as latest
+            FROM records
+            WHERE source_id = ?
+            GROUP BY source_type
+        """, (SOURCE_ID,)).fetchall()
+
+        total_records = db.conn.execute(
+            "SELECT COUNT(*) as cnt FROM records WHERE source_id = ?",
+            (SOURCE_ID,),
+        ).fetchone()["cnt"]
+
+        total_readings = db.conn.execute(
+            "SELECT COUNT(*) as cnt FROM raw_readings WHERE source_id = ?",
+            (SOURCE_ID,),
+        ).fetchone()["cnt"]
+
+        # Files in data/ not yet indexed
+        unindexed = []
+        for fp in sorted(DATA_DIR.rglob("*")):
+            if fp.is_file() and fp.suffix.lower() in SUPPORTED_EXTENSIONS and not fp.name.startswith("."):
+                rel = str(fp.relative_to(DATA_DIR))
+                if rel not in manifest:
+                    unindexed.append(rel)
+
+        result = {
+            "indexed_files": len(manifest),
+            "total_records": total_records,
+            "total_raw_readings": total_readings,
+            "by_type": [
+                {
+                    "source_type": r["source_type"],
+                    "record_count": r["record_count"],
+                    "earliest": r["earliest"],
+                    "latest": r["latest"],
+                }
+                for r in sources
+            ],
+            "files": [
+                {"name": k, "type": v.get("source_type", "?"), "records": v.get("records", 0)}
+                for k, v in manifest.items()
+            ],
+            "unindexed_files": unindexed,
+        }
+        return json.dumps(result, default=str)
+
     @mcp.resource("lemniscus://modalities")
     def list_modalities() -> str:
         """Available data modalities."""
@@ -457,6 +516,69 @@ def cmd_logout() -> None:
     print("Signed out.")
 
 
+def cmd_index() -> None:
+    """Index files in data/ with visible terminal progress."""
+    from auth import check_auth
+    from db import Database
+    from embedder import Embedder
+
+    session = check_auth()
+    if session is None:
+        print("Not authenticated. Run: python server.py login")
+        sys.exit(1)
+
+    # Check for files first
+    DATA_DIR.mkdir(exist_ok=True)
+    files = [
+        f for f in sorted(DATA_DIR.rglob("*"))
+        if f.is_file() and f.suffix.lower() in SUPPORTED_EXTENSIONS and not f.name.startswith(".")
+    ]
+    if not files:
+        print("No supported files found in data/")
+        print("Drop your health files there first (XML, PDF, JSON, etc.)")
+        return
+
+    manifest = _load_manifest()
+    new_files = [
+        f for f in files
+        if str(f.relative_to(DATA_DIR)) not in manifest
+        or manifest[str(f.relative_to(DATA_DIR))].get("size") != f.stat().st_size
+        or manifest[str(f.relative_to(DATA_DIR))].get("mtime") != f.stat().st_mtime
+    ]
+
+    if not new_files:
+        print(f"All {len(files)} files already indexed. Nothing to do.")
+        return
+
+    print(f"Found {len(new_files)} file(s) to index...")
+    print()
+
+    # Init DB + embedder with visible progress
+    print("Loading AI model...", end=" ", flush=True)
+    db = Database(str(BASE_DIR / "lemniscus.db"))
+    db.connect()
+    embedder = Embedder(
+        model_path=str(BASE_DIR / "minilm.onnx"),
+        tokenizer_path=str(BASE_DIR / "tokenizer.json"),
+    )
+    embedder.load()
+    print("done")
+    print()
+
+    # Index with progress
+    result = _scan_and_index(db, embedder)
+    db.close()
+
+    print()
+    print(f"Indexed: {result['indexed']} file(s)")
+    if result.get("skipped"):
+        print(f"Skipped: {result['skipped']} (already indexed)")
+    if result.get("errors"):
+        print(f"Errors:  {result['errors']}")
+    print()
+    print("Ready! Run 'claude' to start querying your health data.")
+
+
 def cmd_status() -> None:
     from auth import check_auth
     session = check_auth()
@@ -469,8 +591,10 @@ def cmd_status() -> None:
     if manifest:
         total_records = sum(e.get("records", 0) for e in manifest.values())
         print(f"Indexed files: {len(manifest)} ({total_records} total records)")
+        for name, info in manifest.items():
+            print(f"  {name} ({info.get('source_type', '?')}) — {info.get('records', 0)} records")
     else:
-        print("No files indexed yet. Drop files in data/ and start the server.")
+        print("No files indexed yet. Drop files in data/ and run: python server.py index")
 
 
 async def cmd_serve() -> None:
@@ -529,6 +653,8 @@ def main() -> None:
         cmd_signup()
     elif cmd == "logout":
         cmd_logout()
+    elif cmd == "index":
+        cmd_index()
     elif cmd == "status":
         cmd_status()
     elif cmd is None:
