@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual environment
+.venv/
+venv/
+
+# Model files (downloaded via setup.sh)
+minilm.onnx
+tokenizer.json
+_hf_cache/
+
+# Data and database (user content)
+data/*
+!data/.gitkeep
+lemniscus.db
+.indexed_files.json
+
+# Auth (user credentials)
+.auth.json
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Logs
+*.log
