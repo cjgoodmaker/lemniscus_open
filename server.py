@@ -1,12 +1,9 @@
-"""Lemniscus Bantom — MCP-only health data server for Claude Code.
+"""Lemniscus Open — MCP-only health data server for Claude Code.
 
 Usage:
-    python server.py              Run MCP stdio server (requires auth)
+    python server.py              Run MCP stdio server
     python server.py index        Index files in data/ (visible progress)
-    python server.py login        Sign in with email/password
-    python server.py signup       Create a new account
-    python server.py logout       Remove stored credentials
-    python server.py status       Show auth and indexing status
+    python server.py status       Show indexing status
 """
 
 from __future__ import annotations
@@ -15,7 +12,6 @@ import json
 import logging
 import sys
 from datetime import datetime
-from getpass import getpass
 from pathlib import Path
 from typing import Any
 
@@ -562,53 +558,10 @@ def create_server(db, embedder, data_dir: str) -> Any:
 # CLI commands
 # ---------------------------------------------------------------------------
 
-def cmd_login() -> None:
-    email = input("Email: ").strip()
-    password = getpass("Password: ")
-    try:
-        from auth import login
-        session = login(email, password)
-        print(f"Signed in as {session['email']} (tier: {session['tier']})")
-    except Exception as e:
-        print(f"Login failed: {e}", file=sys.stderr)
-        sys.exit(1)
-
-
-def cmd_signup() -> None:
-    email = input("Email: ").strip()
-    password = getpass("Password: ")
-    confirm = getpass("Confirm password: ")
-    if password != confirm:
-        print("Passwords do not match.", file=sys.stderr)
-        sys.exit(1)
-    try:
-        from auth import signup
-        result = signup(email, password)
-        if result.get("needs_confirmation"):
-            print(f"Check your email ({email}) to confirm your account, then run: python server.py login")
-        else:
-            print(f"Account created! Signed in as {result['email']} (tier: {result['tier']})")
-    except Exception as e:
-        print(f"Signup failed: {e}", file=sys.stderr)
-        sys.exit(1)
-
-
-def cmd_logout() -> None:
-    from auth import logout
-    logout()
-    print("Signed out.")
-
-
 def cmd_index() -> None:
     """Index files in data/ with visible terminal progress."""
-    from auth import check_auth
     from db import Database
     from embedder import Embedder
-
-    session = check_auth()
-    if session is None:
-        print("Not authenticated. Run: python server.py login")
-        sys.exit(1)
 
     # Check for files first
     DATA_DIR.mkdir(exist_ok=True)
@@ -663,13 +616,6 @@ def cmd_index() -> None:
 
 
 def cmd_status() -> None:
-    from auth import check_auth
-    session = check_auth()
-    if session:
-        print(f"Authenticated: {session['email']} (tier: {session['tier']})")
-    else:
-        print("Not authenticated. Run: python server.py login")
-
     manifest = _load_manifest()
     if manifest:
         total_records = sum(e.get("records", 0) for e in manifest.values())
@@ -682,22 +628,8 @@ def cmd_status() -> None:
 
 async def cmd_serve() -> None:
     """Start the MCP stdio server."""
-    from auth import check_auth
     from db import Database
     from embedder import Embedder
-
-    # Check auth
-    session = check_auth()
-    if session is None:
-        print(
-            "Not authenticated. Please run:\n"
-            "  python server.py signup   (new account)\n"
-            "  python server.py login    (existing account)",
-            file=sys.stderr,
-        )
-        sys.exit(1)
-
-    logger.info(f"Authenticated as {session['email']} (tier: {session['tier']})")
 
     # Verify model files exist
     model_path = BASE_DIR / "minilm.onnx"
@@ -730,13 +662,7 @@ def main() -> None:
     args = sys.argv[1:]
     cmd = args[0] if args else None
 
-    if cmd == "login":
-        cmd_login()
-    elif cmd == "signup":
-        cmd_signup()
-    elif cmd == "logout":
-        cmd_logout()
-    elif cmd == "index":
+    if cmd == "index":
         cmd_index()
     elif cmd == "status":
         cmd_status()

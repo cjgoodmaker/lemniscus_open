@@ -6,12 +6,12 @@ cd "$SCRIPT_DIR"
 
 echo ""
 echo "  ╔═══════════════════════════════╗"
-echo "  ║     Lemniscus Bantom Setup    ║"
+echo "  ║     Lemniscus Open Setup      ║"
 echo "  ╚═══════════════════════════════╝"
 echo ""
 
 # ── Step 1: Python check ──────────────────────────────────────────────
-echo "[1/4] Checking Python..."
+echo "[1/3] Checking Python..."
 if ! command -v python3 &>/dev/null; then
     echo ""
     echo "  ✗ Python 3 not found."
@@ -33,7 +33,7 @@ fi
 echo "  ✓ Python $PY_VERSION"
 
 # ── Step 2: Virtual environment + dependencies ────────────────────────
-echo "[2/4] Setting up environment..."
+echo "[2/3] Setting up environment..."
 if [ ! -d ".venv" ]; then
     python3 -m venv .venv
     echo "  ✓ Created virtual environment"
@@ -45,17 +45,14 @@ fi
 echo "  ✓ Dependencies installed"
 
 # ── Step 3: Download AI model ─────────────────────────────────────────
-echo "[3/4] Checking AI model..."
+echo "[3/3] Checking AI model..."
 if [ ! -f "minilm.onnx" ] || [ ! -f "tokenizer.json" ]; then
     echo "  Downloading embedding model (~90MB)..."
     .venv/bin/python download_model.py
 fi
 echo "  ✓ Model ready"
 
-# ── Step 4: Create data folder ────────────────────────────────────────
-echo "[4/4] Preparing data folder..."
 mkdir -p data
-echo "  ✓ data/ folder ready"
 
 echo ""
 echo "  ╔═══════════════════════════════════════════════════════════╗"
@@ -65,15 +62,7 @@ echo ""
 echo "  Follow these steps to get started:"
 echo ""
 echo "  ┌─────────────────────────────────────────────────────────┐"
-echo "  │ STEP 1: Create your account                            │"
-echo "  │                                                         │"
-echo "  │   .venv/bin/python server.py signup                     │"
-echo "  │                                                         │"
-echo "  │ (or if you already have one: server.py login)           │"
-echo "  └─────────────────────────────────────────────────────────┘"
-echo ""
-echo "  ┌─────────────────────────────────────────────────────────┐"
-echo "  │ STEP 2: Add your health data                            │"
+echo "  │ STEP 1: Add your health data                            │"
 echo "  │                                                         │"
 echo "  │   cp ~/path/to/export.xml data/                         │"
 echo "  │   cp ~/path/to/labwork.pdf data/                        │"
@@ -83,7 +72,7 @@ echo "  │            images (.png/.jpg), text files (.txt/.csv)   │"
 echo "  └─────────────────────────────────────────────────────────┘"
 echo ""
 echo "  ┌─────────────────────────────────────────────────────────┐"
-echo "  │ STEP 3: Index your data                                 │"
+echo "  │ STEP 2: Index your data                                 │"
 echo "  │                                                         │"
 echo "  │   .venv/bin/python server.py index                      │"
 echo "  │                                                         │"
@@ -93,7 +82,7 @@ echo "  │ (Large Apple Health exports may take ~2 minutes)        │"
 echo "  └─────────────────────────────────────────────────────────┘"
 echo ""
 echo "  ┌─────────────────────────────────────────────────────────┐"
-echo "  │ STEP 4: Open Claude Code                                │"
+echo "  │ STEP 3: Open Claude Code                                │"
 echo "  │                                                         │"
 echo "  │   claude                                                │"
 echo "  │                                                         │"

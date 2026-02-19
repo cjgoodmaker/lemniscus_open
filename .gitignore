@@ -23,9 +23,6 @@ lemniscus.db-shm
 lemniscus.db-wal
 .indexed_files.json
 
-# Auth (user credentials)
-.auth.json
-
 # IDE
 .vscode/
 .idea/
