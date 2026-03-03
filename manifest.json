@@ -1,0 +1,72 @@
+{
+  "manifest_version": "0.4",
+  "name": "lemniscus",
+  "display_name": "Lemniscus Health Data",
+  "version": "0.1.0",
+  "description": "Local health data MCP server — search, summarize, and explore Apple Health, Oura, Garmin, labs, and more. All data stays on your machine.",
+  "author": {
+    "name": "Lemniscus"
+  },
+  "icon": "icon.png",
+  "server": {
+    "type": "uv",
+    "entry_point": "server.py",
+    "mcp_config": {
+      "command": "uv",
+      "args": ["run", "--directory", "${__dirname}", "server.py"],
+      "env": {
+        "LEMNISCUS_DATA_DIR": "${user_config.data_directory}"
+      }
+    }
+  },
+  "user_config": {
+    "data_directory": {
+      "type": "directory",
+      "title": "Health Data Folder",
+      "description": "Folder containing your health data files (Apple Health export.xml, Oura/Garmin JSON, PDFs, images, etc.)",
+      "required": true,
+      "default": "${DOCUMENTS}/lemniscus-data"
+    }
+  },
+  "tools": [
+    {
+      "name": "retrieve_health_context",
+      "description": "Search all health data, documents, and photos using natural language"
+    },
+    {
+      "name": "get_health_summary",
+      "description": "Pre-aggregated health statistics grouped by month or year"
+    },
+    {
+      "name": "browse_timeline",
+      "description": "Chronological daily summaries of health data and documents"
+    },
+    {
+      "name": "query_health_readings",
+      "description": "Individual sensor readings — the most granular level"
+    },
+    {
+      "name": "list_sources",
+      "description": "List all available health data sources with record counts"
+    },
+    {
+      "name": "get_vault_file",
+      "description": "Retrieve the original file content for a source (image, PDF, text)"
+    },
+    {
+      "name": "reindex",
+      "description": "Re-scan data folder and index any new or modified files"
+    },
+    {
+      "name": "index_status",
+      "description": "Show what health data has been indexed and is available for search"
+    }
+  ],
+  "compatibility": {
+    "platforms": ["darwin", "win32", "linux"],
+    "runtimes": {
+      "python": ">=3.11"
+    }
+  },
+  "license": "MIT"
+}

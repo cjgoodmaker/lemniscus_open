@@ -28,5 +28,8 @@ lemniscus.db-wal
 .idea/
 *.swp
 
+# Build artifacts
+*.mcpb
+
 # Logs
 *.log

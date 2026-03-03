@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -24,8 +25,8 @@ logging.basicConfig(
 logger = logging.getLogger("lemniscus")
 
 BASE_DIR = Path(__file__).parent
-DATA_DIR = BASE_DIR / "data"
-MANIFEST_PATH = BASE_DIR / ".indexed_files.json"
+DATA_DIR = Path(os.environ["LEMNISCUS_DATA_DIR"]) if os.environ.get("LEMNISCUS_DATA_DIR") else BASE_DIR / "data"
+MANIFEST_PATH = DATA_DIR / ".indexed_files.json"
 SOURCE_ID = "local"
 
 SUPPORTED_EXTENSIONS = {
@@ -109,6 +110,7 @@ def _scan_and_index(db, embedder) -> dict:
     indexed = 0
     skipped = 0
     errors = []
+    cleared = False
 
     for file_path in sorted(DATA_DIR.rglob("*")):
         if not file_path.is_file():
@@ -125,6 +127,14 @@ def _scan_and_index(db, embedder) -> dict:
         if entry and entry.get("size") == stat.st_size and entry.get("mtime") == stat.st_mtime:
             skipped += 1
             continue
+
+        # On first file that needs indexing, clear all old data + manifest
+        # to prevent duplicates (all files share one source_id)
+        if not cleared:
+            logger.info("Clearing old data for clean re-index...")
+            db.clear_source(SOURCE_ID)
+            manifest = {}
+            cleared = True
 
         source_type = _detect_source_type(file_path)
         logger.info(f"Indexing {rel} as {source_type}...")
@@ -591,7 +601,7 @@ def cmd_index() -> None:
 
     # Init DB + embedder with visible progress
     print("Loading AI model...", end=" ", flush=True)
-    db = Database(str(BASE_DIR / "lemniscus.db"))
+    db = Database(str(DATA_DIR / "lemniscus.db"))
     db.connect()
     embedder = Embedder(
         model_path=str(BASE_DIR / "minilm.onnx"),
@@ -641,17 +651,14 @@ async def cmd_serve() -> None:
         )
         sys.exit(1)
 
-    # Init DB + embedder
-    db = Database(str(BASE_DIR / "lemniscus.db"))
+    # Init DB + embedder — store DB in data dir so extension dir stays read-only
+    db = Database(str(DATA_DIR / "lemniscus.db"))
     db.connect()
 
     embedder = Embedder(model_path=str(model_path), tokenizer_path=str(tokenizer_path))
     embedder.load()
 
-    # Auto-index data/
     DATA_DIR.mkdir(exist_ok=True)
-    result = _scan_and_index(db, embedder)
-    logger.info(f"Auto-index: {result}")
 
     # Run MCP stdio server
     mcp = create_server(db=db, embedder=embedder, data_dir=str(DATA_DIR))

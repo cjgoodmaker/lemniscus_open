@@ -35,7 +35,7 @@ class Database:
         self.conn: sqlite3.Connection | None = None
 
     def connect(self) -> None:
-        self.conn = sqlite3.connect(self.db_path, detect_types=sqlite3.PARSE_DECLTYPES, check_same_thread=False)
+        self.conn = sqlite3.connect(self.db_path, detect_types=sqlite3.PARSE_DECLTYPES, check_same_thread=False, timeout=30)
         self.conn.row_factory = sqlite3.Row
         self.conn.execute("PRAGMA journal_mode=WAL")
         self.conn.execute("PRAGMA foreign_keys=ON")
@@ -120,6 +120,23 @@ class Database:
             )
         """)
 
+        c.commit()
+
+    def clear_source(self, source_id: str) -> None:
+        """Remove all data for a source_id so it can be cleanly re-indexed."""
+        c = self.conn
+        # Get record ids for cascade cleanup
+        record_ids = [r[0] for r in c.execute(
+            "SELECT id FROM records WHERE source_id = ?", (source_id,)
+        ).fetchall()]
+        if record_ids:
+            placeholders = ",".join("?" * len(record_ids))
+            c.execute(f"DELETE FROM timeline_entries WHERE record_id IN ({placeholders})", record_ids)
+            c.execute(f"DELETE FROM chunks_fts WHERE entry_id IN (SELECT id FROM timeline_entries WHERE source_id = ?)", (source_id,))
+            c.execute(f"DELETE FROM embeddings WHERE entry_id IN (SELECT id FROM timeline_entries WHERE source_id = ?)", (source_id,))
+        c.execute("DELETE FROM timeline_entries WHERE source_id = ?", (source_id,))
+        c.execute("DELETE FROM records WHERE source_id = ?", (source_id,))
+        c.execute("DELETE FROM raw_readings WHERE source_id = ?", (source_id,))
         c.commit()
 
     # --- Record operations ---
