@@ -1,15 +1,9 @@
 [project]
 name = "lemniscus"
-version = "0.1.0"
-description = "Local health data MCP server — search, summarize, and explore Apple Health, Oura, Garmin, labs, and more"
+version = "0.2.0"
+description = "Local Apple Health MCP server for Claude"
 requires-python = ">=3.11"
 dependencies = [
     "mcp>=1.0.0",
-    "sqlite-vec",
-    "onnxruntime",
-    "tokenizers",
-    "numpy",
     "lxml",
-    "pypdf",
-    "pydantic>=2.0",
 ]

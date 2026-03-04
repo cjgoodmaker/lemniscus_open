@@ -1,46 +1,94 @@
 #!/usr/bin/env bash
-# Build lemniscus.mcpb — a drag-and-drop Desktop Extension for Claude Desktop.
+# Build lemniscus.mcpb — zero-dependency Apple Health extension for Claude Desktop.
+# Bundles standalone Python + only mcp + lxml dependencies.
 # Usage: ./build_mcpb.sh
 set -euo pipefail
 
 BUNDLE_NAME="lemniscus.mcpb"
 STAGING_DIR=$(mktemp -d)
+SITE_PACKAGES=".venv/lib/python3.13/site-packages"
+STANDALONE_PYTHON="$HOME/.local/share/uv/python/cpython-3.13.12-macos-aarch64-none"
 
 echo "Staging bundle in $STAGING_DIR ..."
 
-# Copy manifest
-cp manifest.json "$STAGING_DIR/"
+# Manifest + metadata
+cp manifest.json pyproject.toml "$STAGING_DIR/"
 
-# Copy pyproject.toml (uv reads deps from here)
-cp pyproject.toml "$STAGING_DIR/"
-
-# Copy server source
-cp server.py "$STAGING_DIR/"
-cp db.py "$STAGING_DIR/"
-cp embedder.py "$STAGING_DIR/"
-cp models.py "$STAGING_DIR/"
-cp retrieval.py "$STAGING_DIR/"
-cp pipeline.py "$STAGING_DIR/"
-cp chunker.py "$STAGING_DIR/"
-cp download_model.py "$STAGING_DIR/"
-
-# Copy parsers package
+# Server source (just 3 files + parser)
+cp server.py db.py "$STAGING_DIR/"
 mkdir -p "$STAGING_DIR/parsers"
-cp parsers/*.py "$STAGING_DIR/parsers/"
+cp parsers/__init__.py parsers/apple_health.py "$STAGING_DIR/parsers/"
 
-# Copy icon
+# Icon
 cp logo_1.png "$STAGING_DIR/icon.png"
 
-# Copy embedding model
-cp minilm.onnx "$STAGING_DIR/"
-cp tokenizer.json "$STAGING_DIR/"
+# Bundle standalone Python
+echo "Bundling standalone Python..."
+cp -R "$STANDALONE_PYTHON" "$STAGING_DIR/python"
 
-# Build the zip (mcpb is just a zip)
+# Bundle only needed site-packages (mcp + lxml + their deps)
+echo "Bundling dependencies..."
+LIB_DIR="$STAGING_DIR/lib"
+mkdir -p "$LIB_DIR"
+
+PACKAGES=(
+    annotated_types anyio
+    certifi click
+    h11 httpcore httpx httpx_sse
+    idna
+    lxml
+    mcp
+    pydantic pydantic_core
+    sniffio sse_starlette starlette
+    typing_extensions.py typing_inspection
+    uvicorn
+)
+
+for pkg in "${PACKAGES[@]}"; do
+    for match in "$SITE_PACKAGES"/$pkg; do
+        if [ -e "$match" ]; then
+            cp -R "$match" "$LIB_DIR/"
+        fi
+    done
+done
+
+# Copy .dist-info metadata (needed for importlib.metadata.version())
+DIST_INFOS=(
+    annotated_types anyio
+    certifi click
+    h11 httpcore httpx httpx_sse
+    idna
+    lxml
+    mcp
+    pydantic pydantic_core
+    sniffio sse_starlette starlette
+    typing_extensions typing_inspection
+    uvicorn
+)
+for pkg in "${DIST_INFOS[@]}"; do
+    for match in "$SITE_PACKAGES"/${pkg}*.dist-info; do
+        if [ -d "$match" ]; then
+            cp -R "$match" "$LIB_DIR/"
+        fi
+    done
+done
+
+# Launcher script
+cat > "$STAGING_DIR/run.sh" << 'LAUNCHER'
+#!/usr/bin/env bash
+DIR="$(cd "$(dirname "$0")" && pwd)"
+export PYTHONPATH="$DIR/lib:$PYTHONPATH"
+exec "$DIR/python/bin/python3.13" "$DIR/server.py" "$@"
+LAUNCHER
+chmod +x "$STAGING_DIR/run.sh"
+
+# Build zip
 rm -f "$BUNDLE_NAME"
-(cd "$STAGING_DIR" && zip -r - .) > "$BUNDLE_NAME"
+echo "Compressing bundle..."
+(cd "$STAGING_DIR" && zip -r -q - .) > "$BUNDLE_NAME"
 
 rm -rf "$STAGING_DIR"
 
 echo ""
 echo "Built $BUNDLE_NAME ($(du -h "$BUNDLE_NAME" | cut -f1))"
-echo "Drag this file into Claude Desktop → Settings → Extensions to install."
+echo "Drag into Claude Desktop → Settings → Extensions to install."

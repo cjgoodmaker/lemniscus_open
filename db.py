@@ -1,47 +1,26 @@
-"""SQLite + sqlite-vec database layer."""
+"""SQLite database layer — structured health readings only."""
 
 from __future__ import annotations
 
-import json
 import sqlite3
-import uuid
-from datetime import datetime
-from pathlib import Path
-
-import sqlite_vec
-
-from models import HealthRecord, Modality, TimelineEntry
-
-VECTOR_SIZE = 384
-
-
-def _adapt_uuid(val: uuid.UUID) -> str:
-    return str(val)
-
-
-def _convert_uuid(val: bytes) -> uuid.UUID:
-    return uuid.UUID(val.decode())
-
-
-sqlite3.register_adapter(uuid.UUID, _adapt_uuid)
-sqlite3.register_converter("UUID", _convert_uuid)
 
 
 class Database:
-    """SQLite database with FTS5 and sqlite-vec for vector search."""
+    """SQLite database for Apple Health readings."""
 
     def __init__(self, db_path: str = "lemniscus.db") -> None:
         self.db_path = db_path
         self.conn: sqlite3.Connection | None = None
 
     def connect(self) -> None:
-        self.conn = sqlite3.connect(self.db_path, detect_types=sqlite3.PARSE_DECLTYPES, check_same_thread=False, timeout=30)
+        self.conn = sqlite3.connect(
+            self.db_path,
+            detect_types=sqlite3.PARSE_DECLTYPES,
+            check_same_thread=False,
+            timeout=30,
+        )
         self.conn.row_factory = sqlite3.Row
         self.conn.execute("PRAGMA journal_mode=WAL")
-        self.conn.execute("PRAGMA foreign_keys=ON")
-        self.conn.enable_load_extension(True)
-        sqlite_vec.load(self.conn)
-        self.conn.enable_load_extension(False)
         self._create_tables()
 
     def close(self) -> None:
@@ -50,26 +29,7 @@ class Database:
             self.conn = None
 
     def _create_tables(self) -> None:
-        c = self.conn
-        c.executescript("""
-            CREATE TABLE IF NOT EXISTS records (
-                id TEXT PRIMARY KEY,
-                source_id TEXT NOT NULL,
-                source_type TEXT NOT NULL,
-                modality TEXT NOT NULL,
-                record_type TEXT NOT NULL,
-                value TEXT,
-                unit TEXT,
-                timestamp TEXT NOT NULL,
-                end_timestamp TEXT,
-                metadata TEXT DEFAULT '{}',
-                ingested_at TEXT NOT NULL
-            );
-
-            CREATE INDEX IF NOT EXISTS idx_records_source ON records(source_id);
-            CREATE INDEX IF NOT EXISTS idx_records_timestamp ON records(timestamp);
-            CREATE INDEX IF NOT EXISTS idx_records_type ON records(record_type);
-
+        self.conn.executescript("""
             CREATE TABLE IF NOT EXISTS raw_readings (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 source_id TEXT NOT NULL,
@@ -82,88 +42,41 @@ class Database:
                 end_timestamp TEXT
             );
 
-            CREATE INDEX IF NOT EXISTS idx_raw_source_type_ts ON raw_readings(source_id, record_type, timestamp);
-            CREATE INDEX IF NOT EXISTS idx_raw_modality ON raw_readings(modality);
+            CREATE INDEX IF NOT EXISTS idx_raw_source_type_ts
+                ON raw_readings(source_id, record_type, timestamp);
+            CREATE INDEX IF NOT EXISTS idx_raw_short_name
+                ON raw_readings(short_name);
+            CREATE INDEX IF NOT EXISTS idx_raw_timestamp
+                ON raw_readings(timestamp);
 
-            CREATE TABLE IF NOT EXISTS timeline_entries (
-                id TEXT PRIMARY KEY,
+            CREATE TABLE IF NOT EXISTS metric_stats (
                 source_id TEXT NOT NULL,
-                record_id TEXT NOT NULL,
-                timestamp TEXT NOT NULL,
+                short_name TEXT NOT NULL,
+                record_type TEXT NOT NULL,
+                unit TEXT,
                 modality TEXT NOT NULL,
-                summary TEXT NOT NULL,
-                metadata TEXT DEFAULT '{}',
-                FOREIGN KEY (record_id) REFERENCES records(id)
+                reading_count INTEGER NOT NULL,
+                earliest TEXT,
+                latest TEXT,
+                mean REAL,
+                min REAL,
+                max REAL,
+                median REAL,
+                p5 REAL,
+                p95 REAL,
+                PRIMARY KEY (source_id, short_name)
             );
-
-            CREATE INDEX IF NOT EXISTS idx_timeline_source ON timeline_entries(source_id);
-            CREATE INDEX IF NOT EXISTS idx_timeline_timestamp ON timeline_entries(timestamp);
-            CREATE INDEX IF NOT EXISTS idx_timeline_modality ON timeline_entries(modality);
         """)
-
-        # FTS5 for keyword search
-        c.execute("""
-            CREATE VIRTUAL TABLE IF NOT EXISTS chunks_fts USING fts5(
-                entry_id,
-                source_id,
-                modality,
-                content,
-                tokenize='porter unicode61'
-            )
-        """)
-
-        # sqlite-vec for vector search
-        c.execute(f"""
-            CREATE VIRTUAL TABLE IF NOT EXISTS embeddings USING vec0(
-                entry_id TEXT,
-                embedding float[{VECTOR_SIZE}]
-            )
-        """)
-
-        c.commit()
+        self.conn.commit()
 
     def clear_source(self, source_id: str) -> None:
-        """Remove all data for a source_id so it can be cleanly re-indexed."""
-        c = self.conn
-        # Get record ids for cascade cleanup
-        record_ids = [r[0] for r in c.execute(
-            "SELECT id FROM records WHERE source_id = ?", (source_id,)
-        ).fetchall()]
-        if record_ids:
-            placeholders = ",".join("?" * len(record_ids))
-            c.execute(f"DELETE FROM timeline_entries WHERE record_id IN ({placeholders})", record_ids)
-            c.execute(f"DELETE FROM chunks_fts WHERE entry_id IN (SELECT id FROM timeline_entries WHERE source_id = ?)", (source_id,))
-            c.execute(f"DELETE FROM embeddings WHERE entry_id IN (SELECT id FROM timeline_entries WHERE source_id = ?)", (source_id,))
-        c.execute("DELETE FROM timeline_entries WHERE source_id = ?", (source_id,))
-        c.execute("DELETE FROM records WHERE source_id = ?", (source_id,))
-        c.execute("DELETE FROM raw_readings WHERE source_id = ?", (source_id,))
-        c.commit()
-
-    # --- Record operations ---
-
-    def insert_record(self, record: HealthRecord) -> None:
-        self.conn.execute(
-            """INSERT OR REPLACE INTO records
-               (id, source_id, source_type, modality, record_type, value, unit,
-                timestamp, end_timestamp, metadata, ingested_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (
-                str(record.id),
-                record.source_id,
-                record.source_type,
-                record.modality.value,
-                record.record_type,
-                str(record.value) if record.value is not None else None,
-                record.unit,
-                record.timestamp.isoformat(),
-                record.end_timestamp.isoformat() if record.end_timestamp else None,
-                json.dumps(record.metadata, default=str),
-                record.ingested_at.isoformat(),
-            ),
-        )
+        """Remove all data for a source so it can be cleanly re-indexed."""
+        self.conn.execute("DELETE FROM raw_readings WHERE source_id = ?", (source_id,))
+        self.conn.execute("DELETE FROM metric_stats WHERE source_id = ?", (source_id,))
+        self.conn.commit()
 
     def bulk_insert_raw_readings(self, rows: list[tuple]) -> int:
-        """Bulk insert raw readings efficiently. Each tuple:
+        """Bulk insert raw readings. Each tuple:
         (source_id, record_type, modality, short_name, value, unit, timestamp, end_timestamp)
         """
         self.conn.executemany(
@@ -175,20 +88,85 @@ class Database:
         self.conn.commit()
         return len(rows)
 
-    def query_raw_readings(
+    def rebuild_metric_stats(self, source_id: str) -> None:
+        """Materialise descriptive stats per metric. Called after indexing."""
+        self.conn.execute("DELETE FROM metric_stats WHERE source_id = ?", (source_id,))
+
+        # Base aggregates in one pass
+        rows = self.conn.execute("""
+            SELECT short_name, record_type, unit, modality,
+                   COUNT(*) as reading_count,
+                   MIN(timestamp) as earliest,
+                   MAX(timestamp) as latest,
+                   ROUND(AVG(value), 2) as mean,
+                   ROUND(MIN(value), 2) as min,
+                   ROUND(MAX(value), 2) as max
+            FROM raw_readings
+            WHERE source_id = ? AND value IS NOT NULL
+            GROUP BY short_name, record_type, unit, modality
+        """, (source_id,)).fetchall()
+
+        for r in rows:
+            n = r["reading_count"]
+            p5_row = max(1, int(n * 0.05))
+            med_row = max(1, int(n * 0.50))
+            p95_row = max(1, int(n * 0.95))
+
+            pct_rows = self.conn.execute("""
+                WITH ranked AS (
+                    SELECT value,
+                           ROW_NUMBER() OVER (ORDER BY value) AS rn
+                    FROM raw_readings
+                    WHERE source_id = ? AND short_name = ? AND value IS NOT NULL
+                )
+                SELECT rn, value FROM ranked
+                WHERE rn IN (?, ?, ?)
+            """, (source_id, r["short_name"], p5_row, med_row, p95_row)).fetchall()
+
+            pct = {row["rn"]: row["value"] for row in pct_rows}
+
+            self.conn.execute("""
+                INSERT OR REPLACE INTO metric_stats
+                (source_id, short_name, record_type, unit, modality,
+                 reading_count, earliest, latest, mean, min, max, median, p5, p95)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                source_id, r["short_name"], r["record_type"], r["unit"], r["modality"],
+                n, r["earliest"], r["latest"], r["mean"], r["min"], r["max"],
+                round(pct.get(med_row, r["mean"]), 2),
+                round(pct.get(p5_row, r["min"]), 2),
+                round(pct.get(p95_row, r["max"]), 2),
+            ))
+
+        self.conn.commit()
+
+    def list_metrics(self, source_id: str) -> list[dict]:
+        """List all metrics with cached descriptive stats. Instant read."""
+        rows = self.conn.execute("""
+            SELECT * FROM metric_stats
+            WHERE source_id = ?
+            ORDER BY reading_count DESC
+        """, (source_id,)).fetchall()
+        return [dict(r) for r in rows]
+
+    def query_readings(
         self,
         source_id: str,
         record_type: str | None = None,
+        short_name: str | None = None,
         start: str | None = None,
         end: str | None = None,
-        limit: int = 1000,
+        limit: int = 500,
     ) -> list[dict]:
-        """Query individual raw readings for drill-down."""
+        """Query individual readings with optional filters."""
         query = "SELECT * FROM raw_readings WHERE source_id = ?"
         params: list = [source_id]
         if record_type:
             query += " AND record_type = ?"
             params.append(record_type)
+        if short_name:
+            query += " AND short_name LIKE ?"
+            params.append(f"%{short_name}%")
         if start:
             query += " AND timestamp >= ?"
             params.append(start)
@@ -197,27 +175,20 @@ class Database:
             params.append(end)
         query += " ORDER BY timestamp DESC LIMIT ?"
         params.append(limit)
-        rows = self.conn.execute(query, params).fetchall()
-        return [dict(r) for r in rows]
+        return [dict(r) for r in self.conn.execute(query, params).fetchall()]
 
-    def aggregate_raw_readings(
+    def aggregate_readings(
         self,
         source_id: str,
         period: str = "month",
         year: int | None = None,
         metric: str | None = None,
     ) -> list[dict]:
-        """Aggregate raw readings by period (month or year).
-
-        Returns rows with: short_name, record_type, unit, period,
-        reading_count, avg_value, min_value, max_value, total_value.
-        """
+        """Aggregate readings by month or year. Returns avg/min/max/total."""
         fmt = "%Y-%m" if period == "month" else "%Y"
         query = f"""
             SELECT
-                short_name,
-                record_type,
-                unit,
+                short_name, record_type, unit,
                 strftime('{fmt}', timestamp) AS period,
                 COUNT(*) AS reading_count,
                 ROUND(AVG(value), 2) AS avg_value,
@@ -228,144 +199,21 @@ class Database:
             WHERE source_id = ?
         """
         params: list = [source_id]
-
         if year is not None:
             query += " AND strftime('%Y', timestamp) = ?"
             params.append(str(year))
-
         if metric:
             query += " AND (short_name LIKE ? OR record_type LIKE ?)"
             params.extend([f"%{metric}%", f"%{metric}%"])
-
         query += f"""
             GROUP BY short_name, record_type, unit, strftime('{fmt}', timestamp)
             ORDER BY period DESC, short_name
         """
-        rows = self.conn.execute(query, params).fetchall()
-        return [dict(r) for r in rows]
+        return [dict(r) for r in self.conn.execute(query, params).fetchall()]
 
-    def count_timeline_by_modality(
-        self,
-        source_id: str,
-        start: str | None = None,
-        end: str | None = None,
-    ) -> list[dict]:
-        """Count timeline entries grouped by modality for a date range."""
-        query = "SELECT modality, COUNT(*) as count FROM timeline_entries WHERE source_id = ?"
-        params: list = [source_id]
-        if start:
-            query += " AND timestamp >= ?"
-            params.append(start)
-        if end:
-            query += " AND timestamp <= ?"
-            params.append(end)
-        query += " GROUP BY modality ORDER BY count DESC"
-        rows = self.conn.execute(query, params).fetchall()
-        return [dict(r) for r in rows]
-
-    # --- Timeline operations ---
-
-    def insert_timeline_entry(self, entry: TimelineEntry) -> None:
-        self.conn.execute(
-            """INSERT OR REPLACE INTO timeline_entries
-               (id, source_id, record_id, timestamp, modality, summary, metadata)
-               VALUES (?, ?, ?, ?, ?, ?, ?)""",
-            (
-                str(entry.id),
-                entry.source_id,
-                str(entry.record_id),
-                entry.timestamp.isoformat(),
-                entry.modality.value,
-                entry.summary,
-                json.dumps(entry.metadata, default=str),
-            ),
-        )
-
-    def get_timeline_entry(self, entry_id: str) -> TimelineEntry | None:
+    def reading_count(self, source_id: str) -> int:
         row = self.conn.execute(
-            "SELECT * FROM timeline_entries WHERE id = ?", (entry_id,)
+            "SELECT COUNT(*) as cnt FROM raw_readings WHERE source_id = ?",
+            (source_id,),
         ).fetchone()
-        if not row:
-            return None
-        return self._row_to_timeline_entry(row)
-
-    def list_timeline(
-        self,
-        source_id: str,
-        start: datetime | None = None,
-        end: datetime | None = None,
-        modality: str | None = None,
-        limit: int = 500,
-    ) -> list[TimelineEntry]:
-        query = "SELECT * FROM timeline_entries WHERE source_id = ?"
-        params: list = [source_id]
-
-        if start:
-            query += " AND timestamp >= ?"
-            params.append(start.isoformat())
-        if end:
-            query += " AND timestamp <= ?"
-            params.append(end.isoformat())
-        if modality:
-            query += " AND modality = ?"
-            params.append(modality)
-
-        query += " ORDER BY timestamp ASC LIMIT ?"
-        params.append(limit)
-
-        rows = self.conn.execute(query, params).fetchall()
-        return [self._row_to_timeline_entry(r) for r in rows]
-
-    # --- Embedding operations ---
-
-    def insert_embedding(self, entry_id: str, vector: list[float], content: str, source_id: str, modality: str) -> None:
-        # Store vector
-        self.conn.execute(
-            "INSERT INTO embeddings (entry_id, embedding) VALUES (?, ?)",
-            (entry_id, sqlite_vec.serialize_float32(vector)),
-        )
-        # Store FTS content
-        self.conn.execute(
-            "INSERT INTO chunks_fts (entry_id, source_id, modality, content) VALUES (?, ?, ?, ?)",
-            (entry_id, source_id, modality, content),
-        )
-
-    def commit(self) -> None:
-        """Explicit commit — call after batch operations."""
-        self.conn.commit()
-
-    def search_vectors(self, query_vector: list[float], top_k: int = 20) -> list[tuple[str, float]]:
-        rows = self.conn.execute(
-            """SELECT entry_id, distance
-               FROM embeddings
-               WHERE embedding MATCH ?
-               ORDER BY distance
-               LIMIT ?""",
-            (sqlite_vec.serialize_float32(query_vector), top_k),
-        ).fetchall()
-        return [(row["entry_id"], float(row["distance"])) for row in rows]
-
-    def search_fts(self, query: str, source_id: str, top_k: int = 20) -> list[tuple[str, float]]:
-        rows = self.conn.execute(
-            """SELECT entry_id, rank
-               FROM chunks_fts
-               WHERE chunks_fts MATCH ? AND source_id = ?
-               ORDER BY rank
-               LIMIT ?""",
-            (query, source_id, top_k),
-        ).fetchall()
-        return [(row["entry_id"], -float(row["rank"])) for row in rows]
-
-    # --- Helpers ---
-
-    @staticmethod
-    def _row_to_timeline_entry(row: sqlite3.Row) -> TimelineEntry:
-        return TimelineEntry(
-            id=uuid.UUID(row["id"]),
-            source_id=row["source_id"],
-            record_id=uuid.UUID(row["record_id"]),
-            timestamp=datetime.fromisoformat(row["timestamp"]),
-            modality=Modality(row["modality"]),
-            summary=row["summary"],
-            metadata=json.loads(row["metadata"]),
-        )
+        return row["cnt"] if row else 0

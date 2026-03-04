@@ -23,6 +23,9 @@ lemniscus.db-shm
 lemniscus.db-wal
 .indexed_files.json
 
+# OS
+.DS_Store
+
 # IDE
 .vscode/
 .idea/
