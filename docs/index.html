@@ -375,8 +375,8 @@
   <section class="hero">
     <div class="container">
       <div class="version-badge">Open Source &middot; v1.1 &middot; macOS</div>
-      <h1>Your health data,<br>queried by <em>Claude</em></h1>
-      <p>An open-source MCP server that lets Claude query your Apple Health data. Export from your iPhone, drop in a folder, ask questions in natural language. Everything stays on your machine.</p>
+      <h1>Your wearable data,<br>queried by <em>Claude</em></h1>
+      <p>An open-source MCP server that lets Claude query your Apple Health data. Export from your iPhone, drop in a folder, ask questions in natural language. All storage is local.</p>
       <div class="hero-actions">
         <a href="https://github.com/cjgoodmaker/lemniscus_open/releases" class="btn btn-dark">Download Extension</a>
         <a href="https://lemniscusai.substack.com" class="btn btn-outline">Subscribe for Updates</a>
@@ -403,13 +403,13 @@
     <div class="container">
       <div class="section-header">
         <span class="section-label">Features</span>
-        <h2>Built for privacy</h2>
-        <p>Your health data never leaves your machine. No cloud, no accounts, no third-party access.</p>
+        <h2>Your data, your machine</h2>
+        <p>All storage and indexing happens locally. Data is only sent to Claude when you ask a question &mdash; no separate cloud, no accounts.</p>
       </div>
       <div class="features-grid">
         <div class="feature-cell">
-          <h3>100% Local</h3>
-          <p>All data stored in a local SQLite database. The MCP server communicates over stdio. Nothing touches the network.</p>
+          <h3>Local Storage</h3>
+          <p>All data stored and indexed in a local SQLite database. Only shared with Claude when you query it &mdash; no additional cloud services.</p>
         </div>
         <div class="feature-cell">
           <h3>Zero Setup</h3>
@@ -580,6 +580,7 @@
   <!-- Footer -->
   <footer>
     <div class="container">
+      <p style="max-width:600px; margin:0 auto 16px; color:#aaa; font-size:11px; line-height:1.6;">Lemniscus is not a medical device or diagnostic tool. LLM outputs may be inaccurate &mdash; do not use for medical decisions. Health data queried through Lemniscus is sent to Anthropic's API and subject to their <a href="https://www.anthropic.com/privacy" style="color:#aaa; text-decoration:underline;">privacy policy</a>.</p>
       <p>Lemniscus is open source under the <a href="https://github.com/cjgoodmaker/lemniscus_open/blob/main/LICENSE">MIT License</a>. Built for the <a href="https://modelcontextprotocol.io">Model Context Protocol</a>.</p>
     </div>
   </footer>
