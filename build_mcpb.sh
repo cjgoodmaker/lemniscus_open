@@ -32,13 +32,17 @@ LIB_DIR="$STAGING_DIR/lib"
 mkdir -p "$LIB_DIR"
 
 PACKAGES=(
-    annotated_types anyio
-    certifi click
+    annotated_types anyio attr attrs
+    certifi click dotenv
     h11 httpcore httpx httpx_sse
     idna
+    jsonschema jsonschema_specifications
     lxml
+    markdown_it_py mdurl
     mcp
-    pydantic pydantic_core
+    pygments
+    pydantic pydantic_core pydantic_settings python_multipart
+    referencing rich rpds
     sniffio sse_starlette starlette
     typing_extensions.py typing_inspection
     uvicorn
@@ -54,13 +58,17 @@ done
 
 # Copy .dist-info metadata (needed for importlib.metadata.version())
 DIST_INFOS=(
-    annotated_types anyio
-    certifi click
+    annotated_types anyio attrs
+    certifi click dotenv python_dotenv
     h11 httpcore httpx httpx_sse
     idna
+    jsonschema jsonschema_specifications
     lxml
+    markdown_it_py mdurl
     mcp
-    pydantic pydantic_core
+    pygments
+    pydantic pydantic_core pydantic_settings python_multipart
+    referencing rich rpds
     sniffio sse_starlette starlette
     typing_extensions typing_inspection
     uvicorn

@@ -3,269 +3,349 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Lemniscus — Local Health Data for Claude Code</title>
-  <meta name="description" content="Open-source MCP server that lets Claude Code query your health data. All data stays on your machine.">
+  <title>Lemniscus — Apple Health for Claude</title>
+  <meta name="description" content="Open-source MCP server that lets Claude query your Apple Health data. All data stays on your machine.">
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
   <style>
     :root {
-      --bg: #0d1117;
-      --surface: #161b22;
-      --border: #30363d;
-      --text: #e6edf3;
-      --text-muted: #8b949e;
-      --accent: #58a6ff;
-      --accent-subtle: #1f6feb;
-      --green: #3fb950;
-      --purple: #bc8cff;
-      --orange: #d29922;
-      --red: #f85149;
+      --bg: #ffffff;
+      --bg-alt: #f8f9fa;
+      --surface: #ffffff;
+      --border: #e5e7eb;
+      --border-light: #f0f0f0;
+      --text: #111111;
+      --text-body: #555555;
+      --text-muted: #888888;
+      --accent: #111111;
+      --accent-hover: #333333;
     }
 
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+      font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
       background: var(--bg);
-      color: var(--text);
-      line-height: 1.6;
-      overflow-x: hidden;
+      color: var(--text-body);
+      line-height: 1.7;
+      -webkit-font-smoothing: antialiased;
     }
 
-    a { color: var(--accent); text-decoration: none; }
+    a { color: var(--text); text-decoration: none; }
     a:hover { text-decoration: underline; }
 
-    .container { max-width: 960px; margin: 0 auto; padding: 0 24px; }
+    .container { max-width: 1040px; margin: 0 auto; padding: 0 32px; }
 
-    /* Nav */
+    /* ---- Nav ---- */
     nav {
       position: fixed; top: 0; width: 100%; z-index: 100;
-      background: rgba(13, 17, 23, 0.8);
-      backdrop-filter: blur(12px);
+      background: rgba(255, 255, 255, 0.85);
+      backdrop-filter: blur(16px);
       border-bottom: 1px solid var(--border);
-      padding: 16px 0;
+      padding: 18px 0;
     }
     nav .container {
       display: flex; align-items: center; justify-content: space-between;
     }
-    nav .logo {
-      font-size: 18px; font-weight: 700; color: var(--text);
-      display: flex; align-items: center; gap: 8px;
+    .logo {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 22px; font-weight: 600; color: var(--text);
+      letter-spacing: 0.01em;
     }
-    nav .logo svg { width: 24px; height: 24px; }
-    nav .nav-links { display: flex; gap: 24px; align-items: center; }
-    nav .nav-links a { color: var(--text-muted); font-size: 14px; }
-    nav .nav-links a:hover { color: var(--text); text-decoration: none; }
-    .gh-btn {
+    .nav-links { display: flex; gap: 28px; align-items: center; }
+    .nav-links a {
+      color: var(--text-muted); font-size: 14px; font-weight: 400;
+      transition: color 0.2s;
+    }
+    .nav-links a:hover { color: var(--text); text-decoration: none; }
+    .nav-gh {
       display: inline-flex; align-items: center; gap: 6px;
       padding: 6px 14px; border-radius: 6px;
-      background: var(--surface); border: 1px solid var(--border);
-      color: var(--text); font-size: 13px; font-weight: 500;
+      border: 1px solid var(--border);
+      color: var(--text-body); font-size: 13px; font-weight: 500;
       transition: border-color 0.2s;
     }
-    .gh-btn:hover { border-color: var(--text-muted); text-decoration: none; }
-    .gh-btn svg { width: 16px; height: 16px; fill: var(--text); }
+    .nav-gh:hover { border-color: var(--text-muted); text-decoration: none; }
+    .nav-gh svg { width: 16px; height: 16px; }
 
-    /* Hero */
+    /* ---- Hero ---- */
     .hero {
-      padding: 160px 0 100px;
+      padding: 160px 0 80px;
       text-align: center;
     }
-    .hero .badge {
+    .hero .version-badge {
       display: inline-block;
       padding: 4px 14px; border-radius: 20px;
-      background: rgba(31, 111, 235, 0.15);
-      color: var(--accent); font-size: 13px; font-weight: 500;
-      margin-bottom: 24px;
-      border: 1px solid rgba(88, 166, 255, 0.2);
+      border: 1px solid var(--border);
+      color: var(--text-muted); font-size: 12px; font-weight: 500;
+      letter-spacing: 0.04em; text-transform: uppercase;
+      margin-bottom: 28px;
     }
     .hero h1 {
-      font-size: clamp(36px, 6vw, 56px);
-      font-weight: 800;
-      line-height: 1.15;
+      font-family: 'Cormorant Garamond', serif;
+      font-size: clamp(40px, 7vw, 64px);
+      font-weight: 300;
+      line-height: 1.1;
+      color: var(--text);
       margin-bottom: 20px;
-      letter-spacing: -0.02em;
+      letter-spacing: -0.01em;
     }
-    .hero h1 .gradient {
-      background: linear-gradient(135deg, var(--accent), var(--purple));
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
+    .hero h1 em {
+      font-style: italic;
+      font-weight: 300;
     }
     .hero p {
-      font-size: 18px;
-      color: var(--text-muted);
-      max-width: 560px;
+      font-size: 17px;
+      color: var(--text-body);
+      max-width: 520px;
       margin: 0 auto 40px;
+      font-weight: 300;
+      line-height: 1.8;
     }
     .hero-actions {
       display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;
     }
-    .btn-primary {
+    .btn {
       display: inline-flex; align-items: center; gap: 8px;
-      padding: 12px 24px; border-radius: 8px;
-      background: var(--accent-subtle);
-      color: #fff; font-size: 15px; font-weight: 600;
-      transition: background 0.2s;
+      padding: 12px 28px; border-radius: 6px;
+      font-size: 14px; font-weight: 500;
+      transition: all 0.2s; cursor: pointer;
+      text-decoration: none;
     }
-    .btn-primary:hover { background: var(--accent); text-decoration: none; }
-    .btn-secondary {
-      display: inline-flex; align-items: center; gap: 8px;
-      padding: 12px 24px; border-radius: 8px;
-      background: var(--surface); border: 1px solid var(--border);
-      color: var(--text); font-size: 15px; font-weight: 600;
-      transition: border-color 0.2s;
+    .btn:hover { text-decoration: none; }
+    .btn-dark {
+      background: var(--text); color: #fff;
     }
-    .btn-secondary:hover { border-color: var(--text-muted); text-decoration: none; }
+    .btn-dark:hover { background: var(--accent-hover); }
+    .btn-outline {
+      background: transparent; color: var(--text);
+      border: 1px solid var(--border);
+    }
+    .btn-outline:hover { border-color: var(--text-muted); }
 
-    /* Terminal demo */
-    .terminal {
-      max-width: 680px; margin: 60px auto 0;
-      background: var(--surface);
+    /* ---- Screenshots ---- */
+    .screenshots {
+      padding: 40px 0 80px;
+    }
+    .screenshot-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      max-width: 880px;
+      margin: 0 auto;
+    }
+    .screenshot-grid .wide {
+      grid-column: 1 / -1;
+    }
+    .screenshot-frame {
       border: 1px solid var(--border);
       border-radius: 10px;
       overflow: hidden;
-      text-align: left;
+      background: var(--bg-alt);
     }
-    .terminal-bar {
-      display: flex; align-items: center; gap: 8px;
-      padding: 12px 16px;
-      background: rgba(0,0,0,0.2);
-      border-bottom: 1px solid var(--border);
-    }
-    .terminal-dot {
-      width: 12px; height: 12px; border-radius: 50%;
-    }
-    .terminal-dot.r { background: var(--red); }
-    .terminal-dot.y { background: var(--orange); }
-    .terminal-dot.g { background: var(--green); }
-    .terminal-bar span {
-      flex: 1; text-align: center;
-      font-size: 12px; color: var(--text-muted);
-    }
-    .terminal-body {
-      padding: 20px; font-family: 'SF Mono', 'Fira Code', monospace;
-      font-size: 13px; line-height: 1.7;
-    }
-    .terminal-body .prompt { color: var(--green); }
-    .terminal-body .cmd { color: var(--text); }
-    .terminal-body .comment { color: var(--text-muted); }
-    .terminal-body .output { color: var(--text-muted); }
-    .terminal-body .highlight { color: var(--accent); }
-    .terminal-body .user-q { color: var(--purple); }
-
-    /* Sections */
-    section { padding: 80px 0; }
-    section h2 {
-      font-size: 32px; font-weight: 700;
-      margin-bottom: 12px; letter-spacing: -0.01em;
-    }
-    section .section-sub {
-      color: var(--text-muted); font-size: 16px;
-      margin-bottom: 48px; max-width: 540px;
-    }
-
-    /* Feature grid */
-    .features {
-      display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-      gap: 20px;
-    }
-    .feature-card {
-      padding: 28px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      transition: border-color 0.2s;
-    }
-    .feature-card:hover { border-color: var(--text-muted); }
-    .feature-icon {
-      width: 40px; height: 40px; border-radius: 8px;
-      display: flex; align-items: center; justify-content: center;
-      margin-bottom: 16px; font-size: 20px;
-    }
-    .feature-card h3 { font-size: 16px; font-weight: 600; margin-bottom: 8px; }
-    .feature-card p { font-size: 14px; color: var(--text-muted); }
-
-    /* How it works */
-    .steps {
-      display: grid; gap: 24px; counter-reset: step;
-    }
-    .step {
-      display: grid; grid-template-columns: 48px 1fr;
-      gap: 16px; align-items: start;
-    }
-    .step-num {
-      counter-increment: step;
-      width: 48px; height: 48px; border-radius: 50%;
-      background: var(--surface); border: 1px solid var(--border);
-      display: flex; align-items: center; justify-content: center;
-      font-size: 18px; font-weight: 700; color: var(--accent);
-    }
-    .step-num::before { content: counter(step); }
-    .step-content h3 { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
-    .step-content p { font-size: 14px; color: var(--text-muted); }
-    .step-content code {
-      display: inline-block; margin-top: 8px;
-      padding: 6px 12px; border-radius: 6px;
-      background: var(--surface); border: 1px solid var(--border);
-      font-family: 'SF Mono', 'Fira Code', monospace; font-size: 13px;
-    }
-
-    /* File types table */
-    .file-table {
+    .screenshot-frame img {
       width: 100%;
-      border-collapse: collapse;
-      font-size: 14px;
+      height: auto;
+      display: block;
     }
-    .file-table th {
-      text-align: left; padding: 12px 16px;
-      border-bottom: 1px solid var(--border);
-      color: var(--text-muted); font-weight: 500;
-      font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em;
-    }
-    .file-table td {
-      padding: 12px 16px;
-      border-bottom: 1px solid var(--border);
-    }
-    .file-table tr:last-child td { border-bottom: none; }
-    .file-table code {
-      padding: 2px 8px; border-radius: 4px;
-      background: var(--surface); font-size: 12px;
-      font-family: 'SF Mono', 'Fira Code', monospace;
-    }
-
-    /* Architecture */
-    .arch {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 32px;
-      font-family: 'SF Mono', 'Fira Code', monospace;
-      font-size: 13px;
-      line-height: 2;
-      color: var(--text-muted);
-      overflow-x: auto;
-    }
-    .arch .hl { color: var(--accent); }
-    .arch .gr { color: var(--green); }
-    .arch .pr { color: var(--purple); }
-
-    /* Footer */
-    footer {
-      padding: 40px 0;
-      border-top: 1px solid var(--border);
+    .screenshot-frame .placeholder {
+      padding: 80px 32px;
       text-align: center;
       color: var(--text-muted);
       font-size: 13px;
     }
+
+    /* ---- Sections ---- */
+    section { padding: 80px 0; }
+    section.alt { background: var(--bg-alt); }
+    .section-header {
+      margin-bottom: 48px;
+    }
+    .section-header h2 {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 36px; font-weight: 400;
+      color: var(--text);
+      margin-bottom: 12px;
+    }
+    .section-header p {
+      color: var(--text-muted); font-size: 15px;
+      max-width: 480px;
+      font-weight: 300;
+    }
+    .section-label {
+      display: inline-block;
+      font-size: 11px; font-weight: 500;
+      letter-spacing: 0.08em; text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+    }
+
+    /* ---- Features ---- */
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1px;
+      background: var(--border);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    .feature-cell {
+      padding: 32px;
+      background: var(--surface);
+    }
+    .feature-cell h3 {
+      font-size: 15px; font-weight: 500;
+      color: var(--text);
+      margin-bottom: 8px;
+    }
+    .feature-cell p {
+      font-size: 13px; color: var(--text-muted);
+      line-height: 1.6;
+      font-weight: 300;
+    }
+
+    /* ---- Metrics ---- */
+    .metrics-grid {
+      display: flex; flex-wrap: wrap; gap: 8px;
+    }
+    .metric-pill {
+      padding: 8px 18px; border-radius: 20px;
+      border: 1px solid var(--border);
+      font-size: 13px; font-weight: 400;
+      color: var(--text-body);
+      background: var(--surface);
+    }
+
+    /* ---- Architecture ---- */
+    .arch-block {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 36px;
+      font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+      font-size: 13px;
+      line-height: 2.2;
+      color: var(--text-muted);
+      background: var(--surface);
+      overflow-x: auto;
+    }
+    .arch-block .label { color: var(--text); font-weight: 500; }
+    .arch-block .dim { color: #bbb; }
+
+    /* ---- Install paths ---- */
+    .install-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 24px;
+    }
+    .install-card {
+      padding: 32px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--surface);
+    }
+    .install-card .tag {
+      display: inline-block;
+      padding: 3px 10px; border-radius: 4px;
+      font-size: 10px; font-weight: 500;
+      letter-spacing: 0.06em; text-transform: uppercase;
+      margin-bottom: 16px;
+    }
+    .install-card .tag.easy {
+      background: #f0fdf4; color: #16a34a;
+    }
+    .install-card .tag.dev {
+      background: #f5f3ff; color: #7c3aed;
+    }
+    .install-card h3 {
+      font-size: 17px; font-weight: 500; color: var(--text);
+      margin-bottom: 8px;
+    }
+    .install-card p {
+      font-size: 13px; color: var(--text-muted); margin-bottom: 16px;
+      font-weight: 300;
+    }
+    .install-card ol {
+      list-style: none; counter-reset: step;
+      padding: 0;
+    }
+    .install-card ol li {
+      counter-increment: step;
+      font-size: 13px; color: var(--text-body);
+      padding: 6px 0;
+      padding-left: 24px;
+      position: relative;
+      font-weight: 300;
+    }
+    .install-card ol li::before {
+      content: counter(step);
+      position: absolute; left: 0;
+      font-weight: 500; color: var(--text-muted);
+      font-size: 12px;
+    }
+    .install-card code {
+      display: block; margin-top: 12px;
+      padding: 12px 16px; border-radius: 6px;
+      background: var(--bg-alt); border: 1px solid var(--border-light);
+      font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px;
+      color: var(--text-body);
+      line-height: 1.6;
+    }
+
+    /* ---- Steps ---- */
+    .steps-list {
+      display: grid; gap: 20px; counter-reset: step;
+    }
+    .step-row {
+      display: grid; grid-template-columns: 40px 1fr;
+      gap: 16px; align-items: start;
+    }
+    .step-num {
+      counter-increment: step;
+      width: 40px; height: 40px; border-radius: 50%;
+      border: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px; font-weight: 500; color: var(--text-muted);
+    }
+    .step-num::before { content: counter(step); }
+    .step-body h3 { font-size: 15px; font-weight: 500; color: var(--text); margin-bottom: 4px; }
+    .step-body p { font-size: 13px; color: var(--text-muted); font-weight: 300; }
+
+    /* ---- CTA ---- */
+    .cta-section {
+      text-align: center; padding: 100px 0;
+      border-top: 1px solid var(--border);
+    }
+    .cta-section h2 {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 36px; font-weight: 400;
+      color: var(--text);
+      margin-bottom: 12px;
+    }
+    .cta-section p {
+      color: var(--text-muted); margin-bottom: 32px;
+      font-size: 15px; font-weight: 300;
+    }
+
+    /* ---- Footer ---- */
+    footer {
+      padding: 32px 0;
+      border-top: 1px solid var(--border);
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 12px;
+      font-weight: 300;
+    }
     footer a { color: var(--text-muted); }
     footer a:hover { color: var(--text); }
 
-    /* Mobile */
-    @media (max-width: 640px) {
+    /* ---- Responsive ---- */
+    @media (max-width: 768px) {
       .hero { padding: 120px 0 60px; }
       section { padding: 60px 0; }
+      .features-grid { grid-template-columns: 1fr; }
+      .install-grid { grid-template-columns: 1fr; }
+      .screenshot-grid { grid-template-columns: 1fr; }
       .nav-links .hide-mobile { display: none; }
-      .step { grid-template-columns: 1fr; }
-      .step-num { margin-bottom: -8px; }
+      .step-row { grid-template-columns: 1fr; }
+      .step-num { margin-bottom: -4px; }
     }
   </style>
 </head>
@@ -274,18 +354,13 @@
   <!-- Nav -->
   <nav>
     <div class="container">
-      <div class="logo">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-          <path d="M12 4C8 4 4 8 6 12s6 8 6 8 4-4 6-8-2-8-6-8z"/>
-        </svg>
-        Lemniscus
-      </div>
+      <a href="#" class="logo">Lemniscus</a>
       <div class="nav-links">
         <a href="#features" class="hide-mobile">Features</a>
-        <a href="#quickstart" class="hide-mobile">Quick Start</a>
+        <a href="#install" class="hide-mobile">Install</a>
         <a href="#how-it-works" class="hide-mobile">How It Works</a>
-        <a href="https://github.com/cjgoodmaker/lemniscus_open" class="gh-btn">
-          <svg viewBox="0 0 16 16"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+        <a href="https://github.com/cjgoodmaker/lemniscus_open" class="nav-gh">
+          <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
           GitHub
         </a>
       </div>
@@ -295,35 +370,28 @@
   <!-- Hero -->
   <section class="hero">
     <div class="container">
-      <div class="badge">Open Source &middot; MCP Server</div>
-      <h1>Your health data,<br><span class="gradient">queried by Claude</span></h1>
-      <p>An open-source MCP server that lets Claude Code search and analyze your health data. Drop files in a folder, ask questions in natural language. Everything stays on your machine.</p>
+      <div class="version-badge">Open Source &middot; v1.1 &middot; macOS</div>
+      <h1>Your health data,<br>queried by <em>Claude</em></h1>
+      <p>An open-source MCP server that lets Claude query your Apple Health data. Export from your iPhone, drop in a folder, ask questions in natural language. Everything stays on your machine.</p>
       <div class="hero-actions">
-        <a href="#quickstart" class="btn-primary">Get Started</a>
-        <a href="https://github.com/cjgoodmaker/lemniscus_open" class="btn-secondary">
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
-          View on GitHub
-        </a>
+        <a href="https://github.com/cjgoodmaker/lemniscus_open/releases" class="btn btn-dark">Download Extension</a>
+        <a href="#SUBSTACK_URL" class="btn btn-outline">Subscribe for Updates</a>
       </div>
+    </div>
+  </section>
 
-      <!-- Terminal demo -->
-      <div class="terminal">
-        <div class="terminal-bar">
-          <div class="terminal-dot r"></div>
-          <div class="terminal-dot y"></div>
-          <div class="terminal-dot g"></div>
-          <span>claude</span>
-          <div style="width:36px"></div>
+  <!-- Screenshots -->
+  <section class="screenshots">
+    <div class="container">
+      <div class="screenshot-grid">
+        <div class="screenshot-frame wide">
+          <img src="img/screenshot-1.png" alt="Claude querying Apple Health heart rate data" onerror="this.parentElement.innerHTML='<div class=placeholder>Screenshot: Claude Desktop querying heart rate trends</div>'">
         </div>
-        <div class="terminal-body">
-          <div><span class="prompt">$</span> <span class="cmd">claude</span></div>
-          <br>
-          <div><span class="user-q">&gt; What were my heart rate trends last month?</span></div>
-          <br>
-          <div class="output">Based on your Apple Health data, your average resting heart rate</div>
-          <div class="output">in January was <span class="highlight">62 bpm</span>, down from 65 bpm in December.</div>
-          <div class="output">Your lowest reading was <span class="highlight">48 bpm</span> on Jan 14 during sleep.</div>
-          <div class="output">HRV averaged <span class="highlight">45 ms</span>, a 12% improvement over last month.</div>
+        <div class="screenshot-frame">
+          <img src="img/screenshot-2.png" alt="Lemniscus metric overview" onerror="this.parentElement.innerHTML='<div class=placeholder>Screenshot: Health metrics overview</div>'">
+        </div>
+        <div class="screenshot-frame">
+          <img src="img/screenshot-3.png" alt="Sleep and HRV analysis" onerror="this.parentElement.innerHTML='<div class=placeholder>Screenshot: Sleep and HRV analysis</div>'">
         </div>
       </div>
     </div>
@@ -332,141 +400,178 @@
   <!-- Features -->
   <section id="features">
     <div class="container">
-      <h2>Built for privacy</h2>
-      <p class="section-sub">Your health data never leaves your machine. No cloud, no HTTP server, no third-party access.</p>
-      <div class="features">
-        <div class="feature-card">
-          <div class="feature-icon" style="background:rgba(63,185,80,0.1); color:var(--green);">&#x1f512;</div>
+      <div class="section-header">
+        <span class="section-label">Features</span>
+        <h2>Built for privacy</h2>
+        <p>Your health data never leaves your machine. No cloud, no accounts, no third-party access.</p>
+      </div>
+      <div class="features-grid">
+        <div class="feature-cell">
           <h3>100% Local</h3>
-          <p>All data is stored in a local SQLite database. The MCP server communicates with Claude Code over stdio -- nothing touches the network.</p>
+          <p>All data stored in a local SQLite database. The MCP server communicates over stdio. Nothing touches the network.</p>
         </div>
-        <div class="feature-card">
-          <div class="feature-icon" style="background:rgba(88,166,255,0.1); color:var(--accent);">&#x1f50d;</div>
-          <h3>Semantic Search</h3>
-          <p>Combines vector embeddings (384-dim MiniLM) with full-text keyword search and temporal decay ranking for accurate results.</p>
+        <div class="feature-cell">
+          <h3>Zero Setup</h3>
+          <p>Install as a Claude Desktop extension with one click. No Python, no terminal, no package managers required.</p>
         </div>
-        <div class="feature-card">
-          <div class="feature-icon" style="background:rgba(188,140,255,0.1); color:var(--purple);">&#x1f4c1;</div>
-          <h3>Drop-In File Support</h3>
-          <p>Apple Health XML, Oura/Garmin JSON, PDFs, images, CSVs, and text files. Just copy them into <code>data/</code> and index.</p>
+        <div class="feature-cell">
+          <h3>Instant Stats</h3>
+          <p>Pre-computed descriptive statistics for every metric &mdash; mean, median, p5, p95. Claude gets baseline context immediately.</p>
         </div>
-        <div class="feature-card">
-          <div class="feature-icon" style="background:rgba(210,153,34,0.1); color:var(--orange);">&#x26a1;</div>
-          <h3>Fast Indexing</h3>
-          <p>Processes 600MB Apple Health exports in ~2 minutes. Auto-aggregates millions of readings into queryable daily summaries.</p>
+        <div class="feature-cell">
+          <h3>Composable Tools</h3>
+          <p>Four small, fast MCP tools that Claude chains together. Overview first, then drill down into specific metrics and date ranges.</p>
         </div>
-        <div class="feature-card">
-          <div class="feature-icon" style="background:rgba(248,81,73,0.1); color:var(--red);">&#x1f504;</div>
-          <h3>Live Reindexing</h3>
-          <p>Add new files while Claude Code is running. Ask Claude to reindex and your new data is searchable immediately.</p>
+        <div class="feature-cell">
+          <h3>Auto-Indexing</h3>
+          <p>Drop a new Apple Health export in the data folder. The server detects and indexes it automatically on startup.</p>
         </div>
-        <div class="feature-card">
-          <div class="feature-icon" style="background:rgba(63,185,80,0.1); color:var(--green);">&#x1f9e9;</div>
-          <h3>MCP Native</h3>
-          <p>Speaks the Model Context Protocol natively. No HTTP server, no REST API -- just a clean stdio interface that Claude Code understands.</p>
+        <div class="feature-cell">
+          <h3>Lightweight</h3>
+          <p>~40 MB extension. No vector search, no AI models, no heavy dependencies. Just structured queries over your data.</p>
         </div>
       </div>
     </div>
   </section>
 
-  <!-- Quick Start -->
-  <section id="quickstart" style="background: var(--surface);">
+  <!-- What You Can Query -->
+  <section class="alt">
     <div class="container">
-      <h2>Quick Start</h2>
-      <p class="section-sub">Up and running in under 5 minutes. Requires macOS, Python 3.11+, and Claude Code.</p>
-      <div class="steps">
-        <div class="step">
-          <div class="step-num"></div>
-          <div class="step-content">
-            <h3>Clone and setup</h3>
-            <p>Clone the repo and run the setup script. It creates a virtual environment, installs dependencies, and downloads the embedding model (~90MB).</p>
-            <code>git clone https://github.com/cjgoodmaker/lemniscus_open.git && cd lemniscus_open && bash setup.sh</code>
-          </div>
-        </div>
-        <div class="step">
-          <div class="step-num"></div>
-          <div class="step-content">
-            <h3>Create your account</h3>
-            <p>Sign up and verify your email, then log in.</p>
-            <code>.venv/bin/python server.py signup</code>
-          </div>
-        </div>
-        <div class="step">
-          <div class="step-num"></div>
-          <div class="step-content">
-            <h3>Add your health data</h3>
-            <p>Copy Apple Health exports, lab reports, wearable data, clinical photos -- anything health-related into the <code>data/</code> folder.</p>
-            <code>cp ~/Downloads/export.xml data/</code>
-          </div>
-        </div>
-        <div class="step">
-          <div class="step-num"></div>
-          <div class="step-content">
-            <h3>Index and go</h3>
-            <p>Index your data, then start Claude Code. The MCP server connects automatically.</p>
-            <code>.venv/bin/python server.py index && claude</code>
-          </div>
-        </div>
+      <div class="section-header">
+        <span class="section-label">Data</span>
+        <h2>What you can query</h2>
+        <p>Every metric in your Apple Health export, indexed and queryable by Claude.</p>
       </div>
-    </div>
-  </section>
-
-  <!-- Supported Files -->
-  <section id="supported-files">
-    <div class="container">
-      <h2>Supported Data Sources</h2>
-      <p class="section-sub">Works with the most common health data formats out of the box.</p>
-      <div style="background:var(--surface); border:1px solid var(--border); border-radius:10px; overflow:hidden;">
-        <table class="file-table">
-          <thead>
-            <tr><th>Source</th><th>Format</th><th>Details</th></tr>
-          </thead>
-          <tbody>
-            <tr><td>Apple Health</td><td><code>.xml</code></td><td>iPhone Health export -- auto-aggregates 1M+ readings into daily summaries</td></tr>
-            <tr><td>Oura Ring</td><td><code>.json</code></td><td>Detected by filename or content structure</td></tr>
-            <tr><td>Garmin</td><td><code>.json</code></td><td>Garmin Connect export, auto-detected</td></tr>
-            <tr><td>Lab Reports</td><td><code>.pdf</code></td><td>Text extracted per page, searchable by content</td></tr>
-            <tr><td>Clinical Photos</td><td><code>.png</code> <code>.jpg</code> <code>.heic</code></td><td>Screenshots, mole checks, any medical images</td></tr>
-            <tr><td>Notes &amp; Logs</td><td><code>.txt</code> <code>.md</code> <code>.csv</code></td><td>Free-text health notes, symptom logs, exported data</td></tr>
-          </tbody>
-        </table>
+      <div class="metrics-grid">
+        <span class="metric-pill">Heart Rate</span>
+        <span class="metric-pill">Resting Heart Rate</span>
+        <span class="metric-pill">HRV (SDNN)</span>
+        <span class="metric-pill">Steps</span>
+        <span class="metric-pill">Walking Distance</span>
+        <span class="metric-pill">Flights Climbed</span>
+        <span class="metric-pill">Sleep Duration</span>
+        <span class="metric-pill">Sleep Stages</span>
+        <span class="metric-pill">Blood Oxygen (SpO2)</span>
+        <span class="metric-pill">Respiratory Rate</span>
+        <span class="metric-pill">Body Temperature</span>
+        <span class="metric-pill">Active Energy</span>
+        <span class="metric-pill">Basal Energy</span>
+        <span class="metric-pill">Workouts</span>
+        <span class="metric-pill">VO2 Max</span>
+        <span class="metric-pill">Walking Asymmetry</span>
+        <span class="metric-pill">Headphone Audio</span>
+        <span class="metric-pill">+ 50 more metrics</span>
       </div>
     </div>
   </section>
 
   <!-- How It Works -->
-  <section id="how-it-works" style="background: var(--surface);">
+  <section id="how-it-works">
     <div class="container">
-      <h2>How It Works</h2>
-      <p class="section-sub">A local pipeline from raw files to natural language answers.</p>
-      <div class="arch">
-<span class="gr">data/</span> (your files)
-  &darr;
-<span class="hl">Parsers</span> &mdash; Apple Health XML, JSON, PDF, images, text
-  &darr;
-<span class="hl">Chunker</span> &mdash; splits into searchable segments
-  &darr;
-<span class="hl">Embedder</span> &mdash; 384-dim MiniLM vectors (runs locally via ONNX)
-  &darr;
-<span class="pr">SQLite</span> &mdash; FTS5 full-text index + vector store
-  &darr;
-<span class="hl">MCP Server</span> &mdash; stdio interface, no HTTP
-  &darr;
-<span class="gr">Claude Code</span> &mdash; natural language queries over your health data
+      <div class="section-header">
+        <span class="section-label">Architecture</span>
+        <h2>How it works</h2>
+        <p>Simple architecture. No AI models, no vector search &mdash; just structured queries.</p>
+      </div>
+      <div class="arch-block">
+<span class="label">iPhone</span> <span class="dim">&rarr;</span> Health app <span class="dim">&rarr;</span> Export All Health Data
+  <span class="dim">&darr;</span>
+<span class="label">export.xml</span> <span class="dim">&mdash;</span> your raw Apple Health data
+  <span class="dim">&darr;</span>
+<span class="label">Parser</span> <span class="dim">&mdash;</span> streams millions of readings from XML
+  <span class="dim">&darr;</span>
+<span class="label">SQLite</span> <span class="dim">&mdash;</span> indexed readings + pre-computed stats (mean, median, p5, p95)
+  <span class="dim">&darr;</span>
+<span class="label">MCP Server</span> <span class="dim">&mdash;</span> 4 composable tools over stdio
+  <span class="dim">&darr;</span>
+<span class="label">Claude</span> <span class="dim">&mdash;</span> chains tools to answer your questions
+
+<span class="dim">&mdash;&mdash;&mdash;</span>
+
+<span class="label">list_metrics</span>     <span class="dim">&rarr;</span> available metrics + date ranges + descriptive stats
+<span class="label">get_summary</span>      <span class="dim">&rarr;</span> monthly/yearly aggregates (avg / min / max)
+<span class="label">query_readings</span>   <span class="dim">&rarr;</span> individual readings by metric + date range
+<span class="label">reindex</span>          <span class="dim">&rarr;</span> re-scan for new exports
+      </div>
+    </div>
+  </section>
+
+  <!-- Install -->
+  <section id="install" class="alt">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-label">Getting Started</span>
+        <h2>Install</h2>
+        <p>Two ways to use Lemniscus. Choose what fits you best.</p>
+      </div>
+      <div class="install-grid">
+        <div class="install-card">
+          <span class="tag easy">Easiest</span>
+          <h3>Claude Desktop Extension</h3>
+          <p>Download the extension file and drag it into Claude Desktop. No terminal needed.</p>
+          <ol>
+            <li>Download <a href="https://github.com/cjgoodmaker/lemniscus_open/releases">lemniscus.mcpb</a> from Releases</li>
+            <li>Open Claude Desktop &rarr; Settings &rarr; Extensions</li>
+            <li>Drag the file in and select your Health export folder</li>
+            <li>Start chatting &mdash; "What's my average heart rate?"</li>
+          </ol>
+        </div>
+        <div class="install-card">
+          <span class="tag dev">Developer</span>
+          <h3>Claude Code (CLI)</h3>
+          <p>Clone the repo and run with Claude Code for a developer-friendly workflow.</p>
+          <code>git clone https://github.com/cjgoodmaker/lemniscus_open.git<br>cd lemniscus_open && bash setup.sh</code>
+          <ol>
+            <li>Copy your <code>export.xml</code> into <code>data/</code></li>
+            <li>Run <code>claude</code> &mdash; MCP connects automatically</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Export from iPhone -->
+  <section>
+    <div class="container">
+      <div class="section-header">
+        <span class="section-label">Preparation</span>
+        <h2>Export from iPhone</h2>
+        <p>One-time export, about two minutes.</p>
+      </div>
+      <div class="steps-list">
+        <div class="step-row">
+          <div class="step-num"></div>
+          <div class="step-body">
+            <h3>Open the Health app</h3>
+            <p>Tap your profile picture in the top-right corner.</p>
+          </div>
+        </div>
+        <div class="step-row">
+          <div class="step-num"></div>
+          <div class="step-body">
+            <h3>Export All Health Data</h3>
+            <p>Scroll down and tap "Export All Health Data". This creates a zip containing your export.xml.</p>
+          </div>
+        </div>
+        <div class="step-row">
+          <div class="step-num"></div>
+          <div class="step-body">
+            <h3>Transfer to your Mac</h3>
+            <p>AirDrop, iCloud Drive, or email the zip to yourself. Unzip and copy export.xml to your Lemniscus data folder.</p>
+          </div>
+        </div>
       </div>
     </div>
   </section>
 
   <!-- CTA -->
-  <section style="text-align:center; padding:100px 0;">
+  <section class="cta-section">
     <div class="container">
       <h2>Try it out</h2>
-      <p style="color:var(--text-muted); margin-bottom:32px; font-size:16px;">Open source, free forever. Contributions welcome.</p>
+      <p>Open source under the MIT License. Free forever.</p>
       <div class="hero-actions">
-        <a href="https://github.com/cjgoodmaker/lemniscus_open" class="btn-primary">
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
-          View on GitHub
-        </a>
+        <a href="https://github.com/cjgoodmaker/lemniscus_open/releases" class="btn btn-dark">Download Extension</a>
+        <a href="#SUBSTACK_URL" class="btn btn-outline">Subscribe for Updates</a>
       </div>
     </div>
   </section>
@@ -474,7 +579,7 @@
   <!-- Footer -->
   <footer>
     <div class="container">
-      <p>Lemniscus is open source under the MIT License. Built for the <a href="https://modelcontextprotocol.io">MCP</a> ecosystem.</p>
+      <p>Lemniscus is open source under the <a href="https://github.com/cjgoodmaker/lemniscus_open/blob/main/LICENSE">MIT License</a>. Built for the <a href="https://modelcontextprotocol.io">Model Context Protocol</a>.</p>
     </div>
   </footer>
 

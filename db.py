@@ -20,7 +20,10 @@ class Database:
             timeout=30,
         )
         self.conn.row_factory = sqlite3.Row
-        self.conn.execute("PRAGMA journal_mode=WAL")
+        try:
+            self.conn.execute("PRAGMA journal_mode=WAL")
+        except sqlite3.OperationalError:
+            pass  # Another instance already set WAL mode
         self._create_tables()
 
     def close(self) -> None:

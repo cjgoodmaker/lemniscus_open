@@ -2,7 +2,7 @@
   "manifest_version": "0.4",
   "name": "lemniscus",
   "display_name": "Lemniscus — Apple Health",
-  "version": "0.2.0",
+  "version": "1.1.0",
   "description": "Local Apple Health MCP server. Query your heart rate, steps, sleep, workouts, and more — all data stays on your machine.",
   "author": {
     "name": "Lemniscus"

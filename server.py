@@ -272,11 +272,18 @@ def cmd_index() -> None:
 
 
 async def cmd_serve() -> None:
+    import asyncio
     from db import Database
 
     db = Database(str(DATA_DIR / "lemniscus.db"))
     db.connect()
     DATA_DIR.mkdir(exist_ok=True)
+
+    # Auto-index in background so server starts immediately
+    async def _bg_index():
+        await asyncio.to_thread(_scan_and_index, db)
+
+    asyncio.create_task(_bg_index())
 
     mcp = create_server(db=db)
     await mcp.run_stdio_async()
