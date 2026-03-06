@@ -20,7 +20,7 @@ mkdir -p "$STAGING_DIR/parsers"
 cp parsers/__init__.py parsers/apple_health.py "$STAGING_DIR/parsers/"
 
 # Icon
-cp logo_1.png "$STAGING_DIR/icon.png"
+cp docs/img/logo_1.png "$STAGING_DIR/icon.png"
 
 # Bundle standalone Python
 echo "Bundling standalone Python..."
