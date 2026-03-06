@@ -50,6 +50,10 @@
       font-family: 'Cormorant Garamond', serif;
       font-size: 22px; font-weight: 600; color: var(--text);
       letter-spacing: 0.01em;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .logo img {
+      height: 28px; width: auto;
     }
     .nav-links { display: flex; gap: 28px; align-items: center; }
     .nav-links a {
@@ -354,7 +358,7 @@
   <!-- Nav -->
   <nav>
     <div class="container">
-      <a href="#" class="logo">Lemniscus</a>
+      <a href="#" class="logo"><img src="img/logo_1.png" alt="Lemniscus">Lemniscus</a>
       <div class="nav-links">
         <a href="#features" class="hide-mobile">Features</a>
         <a href="#install" class="hide-mobile">Install</a>
@@ -375,7 +379,7 @@
       <p>An open-source MCP server that lets Claude query your Apple Health data. Export from your iPhone, drop in a folder, ask questions in natural language. Everything stays on your machine.</p>
       <div class="hero-actions">
         <a href="https://github.com/cjgoodmaker/lemniscus_open/releases" class="btn btn-dark">Download Extension</a>
-        <a href="#SUBSTACK_URL" class="btn btn-outline">Subscribe for Updates</a>
+        <a href="https://lemniscusai.substack.com" class="btn btn-outline">Subscribe for Updates</a>
       </div>
     </div>
   </section>
@@ -384,14 +388,11 @@
   <section class="screenshots">
     <div class="container">
       <div class="screenshot-grid">
-        <div class="screenshot-frame wide">
-          <img src="img/screenshot-1.png" alt="Claude querying Apple Health heart rate data" onerror="this.parentElement.innerHTML='<div class=placeholder>Screenshot: Claude Desktop querying heart rate trends</div>'">
+        <div class="screenshot-frame">
+          <img src="img/claude1.png" alt="Claude chaining Lemniscus tools — Get summary, Query readings">
         </div>
         <div class="screenshot-frame">
-          <img src="img/screenshot-2.png" alt="Lemniscus metric overview" onerror="this.parentElement.innerHTML='<div class=placeholder>Screenshot: Health metrics overview</div>'">
-        </div>
-        <div class="screenshot-frame">
-          <img src="img/screenshot-3.png" alt="Sleep and HRV analysis" onerror="this.parentElement.innerHTML='<div class=placeholder>Screenshot: Sleep and HRV analysis</div>'">
+          <img src="img/claude2.png" alt="Claude analyzing monthly health trends from Apple Health data">
         </div>
       </div>
     </div>
@@ -571,7 +572,7 @@
       <p>Open source under the MIT License. Free forever.</p>
       <div class="hero-actions">
         <a href="https://github.com/cjgoodmaker/lemniscus_open/releases" class="btn btn-dark">Download Extension</a>
-        <a href="#SUBSTACK_URL" class="btn btn-outline">Subscribe for Updates</a>
+        <a href="https://lemniscusai.substack.com" class="btn btn-outline">Subscribe for Updates</a>
       </div>
     </div>
   </section>
