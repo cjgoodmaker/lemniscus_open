@@ -1,19 +1,5 @@
-# Python
-__pycache__/
-*.py[cod]
-*.egg-info/
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
-
-# Virtual environment
-.venv/
-venv/
-
-# Model files (downloaded via setup.sh)
-minilm.onnx
-tokenizer.json
-_hf_cache/
+# Node
+node_modules/
 
 # Data and database (user content)
 data/*
@@ -36,3 +22,9 @@ lemniscus.db-wal
 
 # Logs
 *.log
+
+# Python (legacy)
+__pycache__/
+*.py[cod]
+.venv/
+venv/

@@ -1,8 +1,8 @@
 {
   "mcpServers": {
     "lemniscus": {
-      "command": ".venv/bin/python",
-      "args": ["server.py"]
+      "command": "node",
+      "args": ["server/index.js"]
     }
   }
 }

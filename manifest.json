@@ -2,18 +2,23 @@
   "manifest_version": "0.4",
   "name": "lemniscus",
   "display_name": "Lemniscus",
-  "version": "1.1.1",
+  "version": "1.2.0",
   "description": "Local Apple Health MCP server. Query your heart rate, steps, sleep, workouts, and more — all data stays on your machine.",
   "author": {
-    "name": "Lemniscus"
+    "name": "cjgoodmaker",
+    "url": "https://github.com/cjgoodmaker"
   },
   "icon": "icon.png",
+  "repository": "https://github.com/cjgoodmaker/lemniscus_open",
+  "documentation": "https://cjgoodmaker.github.io/lemniscus_open/",
+  "support": "https://github.com/cjgoodmaker/lemniscus_open/issues",
+  "privacy_policy": "https://github.com/cjgoodmaker/lemniscus_open/blob/main/PRIVACY.md",
   "server": {
-    "type": "binary",
-    "entry_point": "run.sh",
+    "type": "node",
+    "entry_point": "server/index.js",
     "mcp_config": {
-      "command": "${__dirname}/run.sh",
-      "args": [],
+      "command": "node",
+      "args": ["${__dirname}/server/index.js"],
       "env": {
         "LEMNISCUS_DATA_DIR": "${user_config.data_directory}"
       }
@@ -25,25 +30,63 @@
       "title": "Health Data Folder",
       "description": "Folder containing your Apple Health export.xml file",
       "required": true,
-      "default": "${DOCUMENTS}/lemniscus-data"
+      "default": ""
     }
   },
   "tools": [
     {
       "name": "list_metrics",
-      "description": "List all available health metrics with counts and date ranges"
+      "description": "List all available health metrics with counts, date ranges, and descriptive stats",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "openWorldHint": false
+      }
     },
     {
-      "name": "query_readings",
-      "description": "Get individual health readings filtered by metric and date range"
+      "name": "get_daily",
+      "description": "Daily aggregated values per metric (sum for steps/energy, avg for vitals, nightly sleep grouping). Supports top-N extremes.",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "openWorldHint": false
+      }
+    },
+    {
+      "name": "get_daily_joined",
+      "description": "Multi-metric daily pivot table — one row per date with all requested metrics as columns. For cross-metric analysis.",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "openWorldHint": false
+      }
     },
     {
       "name": "get_summary",
-      "description": "Aggregated health statistics grouped by month or year"
+      "description": "Aggregated health statistics grouped by month or year",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "openWorldHint": false
+      }
+    },
+    {
+      "name": "query_readings",
+      "description": "Get individual raw readings filtered by metric and date range (up to 5000)",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "openWorldHint": false
+      }
     },
     {
       "name": "reindex",
-      "description": "Re-scan data folder and index new Apple Health exports"
+      "description": "Re-scan data folder and index new Apple Health exports",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "openWorldHint": false
+      }
     }
   ],
   "compatibility": {
