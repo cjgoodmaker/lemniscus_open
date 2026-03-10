@@ -5,14 +5,16 @@
   "version": "1.2.0",
   "description": "Local Apple Health MCP server. Query your heart rate, steps, sleep, workouts, and more — all data stays on your machine.",
   "author": {
-    "name": "cjgoodmaker",
+    "name": "Charles Goodmaker",
     "url": "https://github.com/cjgoodmaker"
   },
   "icon": "icon.png",
-  "repository": "https://github.com/cjgoodmaker/lemniscus_open",
+  "repository": {
+    "url": "https://github.com/cjgoodmaker/lemniscus_open",
+    "type": "git"
+  },
   "documentation": "https://cjgoodmaker.github.io/lemniscus_open/",
   "support": "https://github.com/cjgoodmaker/lemniscus_open/issues",
-  "privacy_policy": "https://github.com/cjgoodmaker/lemniscus_open/blob/main/PRIVACY.md",
   "server": {
     "type": "node",
     "entry_point": "server/index.js",
@@ -36,57 +38,27 @@
   "tools": [
     {
       "name": "list_metrics",
-      "description": "List all available health metrics with counts, date ranges, and descriptive stats",
-      "annotations": {
-        "readOnlyHint": true,
-        "destructiveHint": false,
-        "openWorldHint": false
-      }
+      "description": "List all available health metrics with counts, date ranges, and descriptive stats"
     },
     {
       "name": "get_daily",
-      "description": "Daily aggregated values per metric (sum for steps/energy, avg for vitals, nightly sleep grouping). Supports top-N extremes.",
-      "annotations": {
-        "readOnlyHint": true,
-        "destructiveHint": false,
-        "openWorldHint": false
-      }
+      "description": "Daily aggregated values per metric (sum for steps/energy, avg for vitals, nightly sleep grouping). Supports top-N extremes."
     },
     {
       "name": "get_daily_joined",
-      "description": "Multi-metric daily pivot table — one row per date with all requested metrics as columns. For cross-metric analysis.",
-      "annotations": {
-        "readOnlyHint": true,
-        "destructiveHint": false,
-        "openWorldHint": false
-      }
+      "description": "Multi-metric daily pivot table — one row per date with all requested metrics as columns. For cross-metric analysis."
     },
     {
       "name": "get_summary",
-      "description": "Aggregated health statistics grouped by month or year",
-      "annotations": {
-        "readOnlyHint": true,
-        "destructiveHint": false,
-        "openWorldHint": false
-      }
+      "description": "Aggregated health statistics grouped by month or year"
     },
     {
       "name": "query_readings",
-      "description": "Get individual raw readings filtered by metric and date range (up to 5000)",
-      "annotations": {
-        "readOnlyHint": true,
-        "destructiveHint": false,
-        "openWorldHint": false
-      }
+      "description": "Get individual raw readings filtered by metric and date range (up to 5000)"
     },
     {
       "name": "reindex",
-      "description": "Re-scan data folder and index new Apple Health exports",
-      "annotations": {
-        "readOnlyHint": false,
-        "destructiveHint": false,
-        "openWorldHint": false
-      }
+      "description": "Re-scan data folder and index new Apple Health exports"
     }
   ],
   "compatibility": {

@@ -1,7 +1,10 @@
 "use strict";
 
-const Database = require("better-sqlite3");
+const initSqlJs = require("sql.js");
+const fs = require("fs");
 const path = require("path");
+
+let SQL; // cached sql.js module
 
 class HealthDB {
   constructor(dbPath) {
@@ -9,21 +12,40 @@ class HealthDB {
     this.db = null;
   }
 
-  connect() {
-    this.db = new Database(this.dbPath);
-    this.db.pragma("journal_mode = WAL");
+  async connect() {
+    if (!SQL) {
+      SQL = await initSqlJs();
+    }
+    if (fs.existsSync(this.dbPath)) {
+      const buf = fs.readFileSync(this.dbPath);
+      this.db = new SQL.Database(buf);
+    } else {
+      this.db = new SQL.Database();
+    }
+    try {
+      this.db.run("PRAGMA journal_mode=WAL");
+    } catch {}
     this._createTables();
   }
 
   close() {
     if (this.db) {
+      this._save();
       this.db.close();
       this.db = null;
     }
   }
 
+  _save() {
+    if (!this.db) return;
+    const dir = path.dirname(this.dbPath);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    const data = this.db.export();
+    fs.writeFileSync(this.dbPath, Buffer.from(data));
+  }
+
   _createTables() {
-    this.db.exec(`
+    this.db.run(`
       CREATE TABLE IF NOT EXISTS raw_readings (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         source_id TEXT NOT NULL,
@@ -34,15 +56,12 @@ class HealthDB {
         unit TEXT,
         timestamp TEXT NOT NULL,
         end_timestamp TEXT
-      );
-
-      CREATE INDEX IF NOT EXISTS idx_raw_source_type_ts
-        ON raw_readings(source_id, record_type, timestamp);
-      CREATE INDEX IF NOT EXISTS idx_raw_short_name
-        ON raw_readings(short_name);
-      CREATE INDEX IF NOT EXISTS idx_raw_timestamp
-        ON raw_readings(timestamp);
-
+      )
+    `);
+    this.db.run(`CREATE INDEX IF NOT EXISTS idx_raw_source_type_ts ON raw_readings(source_id, record_type, timestamp)`);
+    this.db.run(`CREATE INDEX IF NOT EXISTS idx_raw_short_name ON raw_readings(short_name)`);
+    this.db.run(`CREATE INDEX IF NOT EXISTS idx_raw_timestamp ON raw_readings(timestamp)`);
+    this.db.run(`
       CREATE TABLE IF NOT EXISTS metric_stats (
         source_id TEXT NOT NULL,
         short_name TEXT NOT NULL,
@@ -59,34 +78,51 @@ class HealthDB {
         p5 REAL,
         p95 REAL,
         PRIMARY KEY (source_id, short_name)
-      );
+      )
     `);
   }
 
+  _allRows(sql, params = []) {
+    const stmt = this.db.prepare(sql);
+    stmt.bind(params);
+    const rows = [];
+    while (stmt.step()) {
+      rows.push(stmt.getAsObject());
+    }
+    stmt.free();
+    return rows;
+  }
+
+  _getRow(sql, params = []) {
+    const rows = this._allRows(sql, params);
+    return rows.length > 0 ? rows[0] : null;
+  }
+
   clearSource(sourceId) {
-    this.db.prepare("DELETE FROM raw_readings WHERE source_id = ?").run(sourceId);
-    this.db.prepare("DELETE FROM metric_stats WHERE source_id = ?").run(sourceId);
+    this.db.run("DELETE FROM raw_readings WHERE source_id = ?", [sourceId]);
+    this.db.run("DELETE FROM metric_stats WHERE source_id = ?", [sourceId]);
   }
 
   bulkInsertRawReadings(rows) {
-    const insert = this.db.prepare(`
+    const stmt = this.db.prepare(`
       INSERT INTO raw_readings
         (source_id, record_type, modality, short_name, value, unit, timestamp, end_timestamp)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `);
-    const tx = this.db.transaction((rows) => {
-      for (const row of rows) {
-        insert.run(...row);
-      }
-    });
-    tx(rows);
+    this.db.run("BEGIN TRANSACTION");
+    for (const row of rows) {
+      stmt.run(row);
+    }
+    this.db.run("COMMIT");
+    stmt.free();
+    this._save();
     return rows.length;
   }
 
   rebuildMetricStats(sourceId) {
-    this.db.prepare("DELETE FROM metric_stats WHERE source_id = ?").run(sourceId);
+    this.db.run("DELETE FROM metric_stats WHERE source_id = ?", [sourceId]);
 
-    const baseRows = this.db.prepare(`
+    const baseRows = this._allRows(`
       SELECT short_name, record_type, unit, modality,
              COUNT(*) as reading_count,
              MIN(timestamp) as earliest,
@@ -97,57 +133,54 @@ class HealthDB {
       FROM raw_readings
       WHERE source_id = ? AND value IS NOT NULL
       GROUP BY short_name, record_type, unit, modality
-    `).all(sourceId);
+    `, [sourceId]);
 
-    const pctStmt = this.db.prepare(`
-      WITH ranked AS (
-        SELECT value,
-               ROW_NUMBER() OVER (ORDER BY value) AS rn
-        FROM raw_readings
-        WHERE source_id = ? AND short_name = ? AND value IS NOT NULL
-      )
-      SELECT rn, value FROM ranked
-      WHERE rn IN (?, ?, ?)
-    `);
+    this.db.run("BEGIN TRANSACTION");
+    for (const r of baseRows) {
+      const n = r.reading_count;
+      const p5Row = Math.max(1, Math.floor(n * 0.05));
+      const medRow = Math.max(1, Math.floor(n * 0.5));
+      const p95Row = Math.max(1, Math.floor(n * 0.95));
 
-    const insertStats = this.db.prepare(`
-      INSERT OR REPLACE INTO metric_stats
-        (source_id, short_name, record_type, unit, modality,
-         reading_count, earliest, latest, mean, min, max, median, p5, p95)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
+      const pctRows = this._allRows(`
+        WITH ranked AS (
+          SELECT value,
+                 ROW_NUMBER() OVER (ORDER BY value) AS rn
+          FROM raw_readings
+          WHERE source_id = ? AND short_name = ? AND value IS NOT NULL
+        )
+        SELECT rn, value FROM ranked
+        WHERE rn IN (?, ?, ?)
+      `, [sourceId, r.short_name, p5Row, medRow, p95Row]);
 
-    const tx = this.db.transaction(() => {
-      for (const r of baseRows) {
-        const n = r.reading_count;
-        const p5Row = Math.max(1, Math.floor(n * 0.05));
-        const medRow = Math.max(1, Math.floor(n * 0.5));
-        const p95Row = Math.max(1, Math.floor(n * 0.95));
-
-        const pctRows = pctStmt.all(sourceId, r.short_name, p5Row, medRow, p95Row);
-        const pct = {};
-        for (const row of pctRows) {
-          pct[row.rn] = row.value;
-        }
-
-        insertStats.run(
-          sourceId, r.short_name, r.record_type, r.unit, r.modality,
-          n, r.earliest, r.latest, r.mean, r.min, r.max,
-          round2(pct[medRow] ?? r.mean),
-          round2(pct[p5Row] ?? r.min),
-          round2(pct[p95Row] ?? r.max)
-        );
+      const pct = {};
+      for (const row of pctRows) {
+        pct[row.rn] = row.value;
       }
-    });
-    tx();
+
+      this.db.run(`
+        INSERT OR REPLACE INTO metric_stats
+          (source_id, short_name, record_type, unit, modality,
+           reading_count, earliest, latest, mean, min, max, median, p5, p95)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `, [
+        sourceId, r.short_name, r.record_type, r.unit, r.modality,
+        n, r.earliest, r.latest, r.mean, r.min, r.max,
+        round2(pct[medRow] ?? r.mean),
+        round2(pct[p5Row] ?? r.min),
+        round2(pct[p95Row] ?? r.max),
+      ]);
+    }
+    this.db.run("COMMIT");
+    this._save();
   }
 
   listMetrics(sourceId) {
-    return this.db.prepare(`
+    return this._allRows(`
       SELECT * FROM metric_stats
       WHERE source_id = ?
       ORDER BY reading_count DESC
-    `).all(sourceId);
+    `, [sourceId]);
   }
 
   queryReadings(sourceId, { recordType, shortName, start, end, limit = 500 } = {}) {
@@ -171,7 +204,7 @@ class HealthDB {
     }
     query += " ORDER BY timestamp DESC LIMIT ?";
     params.push(limit);
-    return this.db.prepare(query).all(...params);
+    return this._allRows(query, params);
   }
 
   aggregateReadings(sourceId, { period = "month", year, metric } = {}) {
@@ -201,7 +234,7 @@ class HealthDB {
       GROUP BY short_name, record_type, unit, strftime('${fmt}', timestamp)
       ORDER BY period DESC, short_name
     `;
-    return this.db.prepare(query).all(...params);
+    return this._allRows(query, params);
   }
 
   dailyAggregate(sourceId, { metrics, start, end, topN, order = "asc" } = {}) {
@@ -241,9 +274,8 @@ class HealthDB {
 
     query += " GROUP BY date, short_name, unit, modality ORDER BY date, short_name";
 
-    const rows = this.db.prepare(query).all(...params);
+    const rows = this._allRows(query, params);
 
-    // Post-process: pick the right primary value per metric type
     for (const row of rows) {
       if (SUM_METRICS.has(row.short_name)) {
         row.value = row.sum;
@@ -257,7 +289,6 @@ class HealthDB {
       }
     }
 
-    // Top-N / extremes
     if (topN && rows.length > 0) {
       const sortDesc = order.toLowerCase() === "desc";
       rows.sort((a, b) => {
@@ -314,17 +345,21 @@ class HealthDB {
   }
 
   readingCount(sourceId) {
-    const row = this.db.prepare(
-      "SELECT COUNT(*) as cnt FROM raw_readings WHERE source_id = ?"
-    ).get(sourceId);
+    const row = this._getRow(
+      "SELECT COUNT(*) as cnt FROM raw_readings WHERE source_id = ?",
+      [sourceId]
+    );
     return row ? row.cnt : 0;
   }
 }
 
 const SUM_METRICS = new Set([
-  "Steps", "Distance", "ActiveEnergy", "BasalEnergy", "FlightsClimbed",
-  "ExerciseTime", "StandTime", "Calories", "Protein", "Carbs", "Fat", "Water",
-  "SleepAnalysis",
+  "Steps", "Distance", "DistanceCycling", "DistanceSwimming", "DistanceWheelchair",
+  "DistanceSnowSports", "ActiveEnergy", "BasalEnergy", "FlightsClimbed",
+  "ExerciseTime", "MoveTime", "StandTime", "PushCount", "SwimmingStrokes",
+  "Calories", "Protein", "Carbs", "Fat", "Water",
+  "SleepAnalysis", "MindfulSession",
+  "InhalerUsage", "AlcoholicBeverages",
 ]);
 
 function round2(v) {

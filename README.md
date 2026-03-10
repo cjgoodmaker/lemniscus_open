@@ -110,12 +110,22 @@ All data stays on your machine. No telemetry, no analytics, no network connectio
 
 When Claude queries your data through Lemniscus tools, the returned results are sent to Anthropic's API as part of your conversation, subject to [Anthropic's privacy policy](https://www.anthropic.com/privacy).
 
-## CLI Commands
+## Troubleshooting
 
-| Command | Description |
-|---------|-------------|
-| `.venv/bin/python server.py index` | Index files in `data/` with visible progress |
-| `.venv/bin/python server.py` | Start MCP stdio server (used automatically by Claude) |
+**"No data indexed yet"**
+Place your Apple Health `export.xml` in the data folder you selected during setup, then ask Claude to "reindex my health data".
+
+**Duplicate readings**
+Ask Claude to "reindex with force=true". This drops all existing data and re-indexes from scratch.
+
+**Extension disconnects in Claude Desktop**
+Quit and reopen Claude Desktop. The extension restarts automatically. Check logs in Claude Desktop → Settings → Extensions → Lemniscus.
+
+**Indexing takes a long time**
+Large exports (600MB+, 1M+ readings) can take 1-2 minutes on first index. Subsequent startups skip already-indexed files.
+
+**Missing metrics**
+Run `list_metrics` to see all indexed data. Lemniscus indexes every Record and Workout element in your export — if a metric doesn't appear, it's not in your export.xml.
 
 ## License
 
