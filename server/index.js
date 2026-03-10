@@ -169,14 +169,9 @@ async function main() {
 
   server.tool(
     "list_metrics",
-    {
-      title: "List Metrics",
-      description: "List all available health metrics with counts, date ranges, and descriptive stats. Call this first to see what data is available.",
-      readOnlyHint: true,
-      destructiveHint: false,
-      openWorldHint: false,
-    },
+    "List all available health metrics with counts, date ranges, and descriptive stats. Call this first to see what data is available.",
     { source_id: z.string().default(SOURCE_ID).describe("Data source identifier") },
+    { title: "List Metrics", readOnlyHint: true, destructiveHint: false, openWorldHint: false },
     async ({ source_id }) => {
       try {
         const metrics = db.listMetrics(source_id);
@@ -193,13 +188,7 @@ async function main() {
 
   server.tool(
     "query_readings",
-    {
-      title: "Query Readings",
-      description: "Get individual health readings filtered by metric and date range. Use the metric parameter to filter by short_name (e.g. 'HeartRate', 'Steps'). Call list_metrics first to see available names.",
-      readOnlyHint: true,
-      destructiveHint: false,
-      openWorldHint: false,
-    },
+    "Get individual health readings filtered by metric and date range. Use the metric parameter to filter by short_name (e.g. 'HeartRate', 'Steps'). Call list_metrics first to see available names.",
     {
       metric: z.string().optional().describe("Filter by short_name (e.g. 'HeartRate', 'Steps', 'HRV'). Partial match supported."),
       start: z.string().optional().describe("Start of time range (ISO 8601, e.g. '2024-01-01')"),
@@ -207,6 +196,7 @@ async function main() {
       limit: z.number().min(1).max(5000).default(500).describe("Maximum readings to return (1-5000, default 500)"),
       source_id: z.string().default(SOURCE_ID).describe("Data source identifier"),
     },
+    { title: "Query Readings", readOnlyHint: true, destructiveHint: false, openWorldHint: false },
     async ({ metric, start, end, limit, source_id }) => {
       try {
         const rows = db.queryReadings(source_id, { shortName: metric, start, end, limit });
@@ -219,19 +209,14 @@ async function main() {
 
   server.tool(
     "get_summary",
-    {
-      title: "Get Summary",
-      description: "Aggregated health statistics grouped by month or year. Returns avg/min/max/total for each metric. Best for trends and overviews.",
-      readOnlyHint: true,
-      destructiveHint: false,
-      openWorldHint: false,
-    },
+    "Aggregated health statistics grouped by month or year. Returns avg/min/max/total for each metric. Best for trends and overviews.",
     {
       period: z.enum(["month", "year"]).default("month").describe("'month' or 'year'"),
       year: z.number().optional().describe("Optional year filter (e.g. 2024)"),
       metric: z.string().optional().describe("Optional metric filter (e.g. 'HeartRate', 'Steps'). Partial match."),
       source_id: z.string().default(SOURCE_ID).describe("Data source identifier"),
     },
+    { title: "Get Summary", readOnlyHint: true, destructiveHint: false, openWorldHint: false },
     async ({ period, year, metric, source_id }) => {
       try {
         const rows = db.aggregateReadings(source_id, { period, year, metric });
@@ -270,13 +255,7 @@ async function main() {
 
   server.tool(
     "get_daily",
-    {
-      title: "Get Daily",
-      description: "Get daily aggregated values for one or more metrics. Returns one row per day per metric with the appropriate aggregation: SUM for steps/energy, AVG for vitals, nightly grouping for sleep. Use top_n with order='desc' to find best/worst days.",
-      readOnlyHint: true,
-      destructiveHint: false,
-      openWorldHint: false,
-    },
+    "Get daily aggregated values for one or more metrics. Returns one row per day per metric with the appropriate aggregation: SUM for steps/energy, AVG for vitals, nightly grouping for sleep. Use top_n with order='desc' to find best/worst days.",
     {
       metrics: z.string().optional().describe("Comma-separated metric short_names (e.g. 'Steps,HeartRate,SleepAnalysis'). None = all."),
       start: z.string().optional().describe("Start date (ISO 8601, e.g. '2024-01-01')"),
@@ -285,6 +264,7 @@ async function main() {
       order: z.enum(["asc", "desc"]).default("asc").describe("'asc' (lowest first) or 'desc' (highest first). Used with top_n."),
       source_id: z.string().default(SOURCE_ID).describe("Data source identifier"),
     },
+    { title: "Get Daily", readOnlyHint: true, destructiveHint: false, openWorldHint: false },
     async ({ metrics, start, end, top_n, order, source_id }) => {
       try {
         const metricList = metrics ? metrics.split(",").map((m) => m.trim()) : undefined;
@@ -304,19 +284,14 @@ async function main() {
 
   server.tool(
     "get_daily_joined",
-    {
-      title: "Get Daily Joined",
-      description: "Get a multi-metric daily table — one row per date, one column per metric. Perfect for cross-metric analysis. Workout types are merged into workout_count and workout_duration columns.",
-      readOnlyHint: true,
-      destructiveHint: false,
-      openWorldHint: false,
-    },
+    "Get a multi-metric daily table — one row per date, one column per metric. Perfect for cross-metric analysis. Workout types are merged into workout_count and workout_duration columns.",
     {
       metrics: z.string().describe("Comma-separated metric short_names (e.g. 'Steps,RestingHR,SleepAnalysis,ActiveEnergy')"),
       start: z.string().optional().describe("Start date (ISO 8601, e.g. '2024-01-01')"),
       end: z.string().optional().describe("End date (ISO 8601, e.g. '2024-12-31')"),
       source_id: z.string().default(SOURCE_ID).describe("Data source identifier"),
     },
+    { title: "Get Daily Joined", readOnlyHint: true, destructiveHint: false, openWorldHint: false },
     async ({ metrics, start, end, source_id }) => {
       try {
         const metricList = metrics.split(",").map((m) => m.trim());
@@ -330,16 +305,11 @@ async function main() {
 
   server.tool(
     "reindex",
-    {
-      title: "Reindex",
-      description: "Re-scan the data folder and index any new or modified Apple Health exports. Use force=true to drop all data and re-index from scratch (fixes duplicates).",
-      readOnlyHint: false,
-      destructiveHint: false,
-      openWorldHint: false,
-    },
+    "Re-scan the data folder and index any new or modified Apple Health exports. Use force=true to drop all data and re-index from scratch (fixes duplicates).",
     {
       force: z.boolean().default(false).describe("If true, drop all existing data and re-index from scratch"),
     },
+    { title: "Reindex", readOnlyHint: false, destructiveHint: false, openWorldHint: false },
     async ({ force }) => {
       try {
         if (force) {
