@@ -62,6 +62,18 @@ class HealthDB {
     this.db.run(`CREATE INDEX IF NOT EXISTS idx_raw_short_name ON raw_readings(short_name)`);
     this.db.run(`CREATE INDEX IF NOT EXISTS idx_raw_timestamp ON raw_readings(timestamp)`);
     this.db.run(`
+      CREATE TABLE IF NOT EXISTS daily_stats (
+        source_id TEXT NOT NULL,
+        date TEXT NOT NULL,
+        short_name TEXT NOT NULL,
+        value REAL,
+        unit TEXT,
+        count INTEGER,
+        PRIMARY KEY (source_id, date, short_name)
+      )
+    `);
+    this.db.run(`CREATE INDEX IF NOT EXISTS idx_daily_metric ON daily_stats(source_id, short_name, date)`);
+    this.db.run(`
       CREATE TABLE IF NOT EXISTS metric_stats (
         source_id TEXT NOT NULL,
         short_name TEXT NOT NULL,
@@ -101,6 +113,7 @@ class HealthDB {
   clearSource(sourceId) {
     this.db.run("DELETE FROM raw_readings WHERE source_id = ?", [sourceId]);
     this.db.run("DELETE FROM metric_stats WHERE source_id = ?", [sourceId]);
+    this.db.run("DELETE FROM daily_stats WHERE source_id = ?", [sourceId]);
   }
 
   bulkInsertRawReadings(rows) {
@@ -175,6 +188,113 @@ class HealthDB {
     this._save();
   }
 
+  buildDailyStats(sourceId) {
+    this.db.run("DELETE FROM daily_stats WHERE source_id = ?", [sourceId]);
+
+    // Materialize daily aggregates — SUM for cumulative metrics, AVG for vitals.
+    // Sleep metrics use nightly grouping (pre-midnight → previous day).
+    const rows = this._allRows(`
+      SELECT
+        CASE
+          WHEN short_name IN ('SleepInBed','SleepAsleep','SleepAwake','SleepCore','SleepDeep','SleepREM')
+               AND CAST(strftime('%H', timestamp) AS INTEGER) < 12
+          THEN DATE(timestamp, '-1 day')
+          ELSE DATE(timestamp)
+        END AS date,
+        short_name, unit,
+        COUNT(*) AS count,
+        ROUND(SUM(value), 2) AS sum,
+        ROUND(AVG(value), 2) AS avg
+      FROM raw_readings
+      WHERE source_id = ? AND value IS NOT NULL
+      GROUP BY date, short_name, unit
+      ORDER BY date
+    `, [sourceId]);
+
+    const stmt = this.db.prepare(`
+      INSERT INTO daily_stats (source_id, date, short_name, value, unit, count)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `);
+    this.db.run("BEGIN TRANSACTION");
+    for (const r of rows) {
+      const value = SUM_METRICS.has(r.short_name) ? r.sum : r.avg;
+      stmt.run([sourceId, r.date, r.short_name, value, r.unit, r.count]);
+    }
+    this.db.run("COMMIT");
+    stmt.free();
+    this._save();
+    return rows.length;
+  }
+
+  getTrends(sourceId, { metric, start, end, window7 = true, window30 = true } = {}) {
+    let query = "SELECT date, short_name, value, unit FROM daily_stats WHERE source_id = ?";
+    const params = [sourceId];
+
+    if (metric) {
+      query += " AND short_name = ?";
+      params.push(metric);
+    }
+    if (start) {
+      // Pull extra days before start so the rolling window is warm at the start date
+      const lookback = window30 ? 30 : 7;
+      const warmStart = new Date(start);
+      warmStart.setDate(warmStart.getDate() - lookback);
+      query += " AND date >= ?";
+      params.push(warmStart.toISOString().slice(0, 10));
+    }
+    if (end) {
+      query += " AND date <= ?";
+      params.push(end);
+    }
+    query += " ORDER BY short_name, date";
+
+    const rows = this._allRows(query, params);
+
+    // Group by metric
+    const byMetric = {};
+    for (const r of rows) {
+      if (!byMetric[r.short_name]) byMetric[r.short_name] = [];
+      byMetric[r.short_name].push(r);
+    }
+
+    const results = {};
+    for (const [name, days] of Object.entries(byMetric)) {
+      const trend = [];
+      for (let i = 0; i < days.length; i++) {
+        const d = days[i];
+        const entry = { date: d.date, value: d.value };
+
+        if (window7) {
+          const w7 = days.slice(Math.max(0, i - 6), i + 1).map(r => r.value);
+          entry.avg_7d = round2(w7.reduce((a, b) => a + b, 0) / w7.length);
+        }
+
+        if (window30 && i >= 6) {
+          const w30 = days.slice(Math.max(0, i - 29), i + 1).map(r => r.value);
+          entry.avg_30d = round2(w30.reduce((a, b) => a + b, 0) / w30.length);
+
+          // Slope (linear regression over the window)
+          entry.slope_30d = round4(linearSlope(w30));
+
+          // Coefficient of variation (stddev / mean)
+          const mean = w30.reduce((a, b) => a + b, 0) / w30.length;
+          if (mean !== 0) {
+            const variance = w30.reduce((s, v) => s + (v - mean) ** 2, 0) / w30.length;
+            entry.cv_30d = round2(Math.sqrt(variance) / Math.abs(mean));
+          }
+        }
+
+        trend.push(entry);
+      }
+
+      // Trim warmup rows — only return from the requested start date
+      const filtered = start ? trend.filter(t => t.date >= start) : trend;
+      results[name] = { unit: days[0].unit, days: filtered };
+    }
+
+    return results;
+  }
+
   listMetrics(sourceId) {
     return this._allRows(`
       SELECT * FROM metric_stats
@@ -241,7 +361,7 @@ class HealthDB {
     let query = `
       SELECT
         CASE
-          WHEN short_name = 'SleepAnalysis'
+          WHEN short_name IN ('SleepInBed','SleepAsleep','SleepAwake','SleepCore','SleepDeep','SleepREM')
                AND CAST(strftime('%H', timestamp) AS INTEGER) < 12
           THEN DATE(timestamp, '-1 day')
           ELSE DATE(timestamp)
@@ -358,7 +478,8 @@ const SUM_METRICS = new Set([
   "DistanceSnowSports", "ActiveEnergy", "BasalEnergy", "FlightsClimbed",
   "ExerciseTime", "MoveTime", "StandTime", "PushCount", "SwimmingStrokes",
   "Calories", "Protein", "Carbs", "Fat", "Water",
-  "SleepAnalysis", "MindfulSession",
+  "SleepInBed", "SleepAsleep", "SleepAwake", "SleepCore", "SleepDeep", "SleepREM",
+  "MindfulSession",
   "InhalerUsage", "AlcoholicBeverages",
 ]);
 
@@ -366,8 +487,28 @@ function round2(v) {
   return v != null ? Math.round(v * 100) / 100 : null;
 }
 
+function round4(v) {
+  return v != null ? Math.round(v * 10000) / 10000 : null;
+}
+
 function round1(v) {
   return v != null ? Math.round(v * 10) / 10 : null;
+}
+
+// Least-squares slope over an array of evenly spaced values.
+// Returns the daily rate of change (units per day).
+function linearSlope(values) {
+  const n = values.length;
+  if (n < 2) return 0;
+  let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
+  for (let i = 0; i < n; i++) {
+    sumX += i;
+    sumY += values[i];
+    sumXY += i * values[i];
+    sumX2 += i * i;
+  }
+  const denom = n * sumX2 - sumX * sumX;
+  return denom === 0 ? 0 : (n * sumXY - sumX * sumY) / denom;
 }
 
 module.exports = { HealthDB };

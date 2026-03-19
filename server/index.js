@@ -132,6 +132,8 @@ async function _scanAndIndex(db) {
   if (indexed > 0) {
     console.error("Building metric stats cache...");
     db.rebuildMetricStats(SOURCE_ID);
+    console.error("Building daily stats for trends...");
+    db.buildDailyStats(SOURCE_ID);
   }
 
   saveManifest(manifest);
@@ -299,6 +301,30 @@ async function main() {
         return toolResult({ count: rows.length, days: rows });
       } catch (e) {
         return toolError(`Failed to get daily joined data: ${e.message}`);
+      }
+    }
+  );
+
+  server.tool(
+    "get_trends",
+    "Rolling trends for a metric: 7-day and 30-day moving averages, 30-day slope (rate of change per day), and 30-day coefficient of variation. Use for resting HR trends, HRV variability, VO2 max progression, or exercise volume over time.",
+    {
+      metric: z.string().describe("Metric short_name (e.g. 'RestingHR', 'HRV', 'VO2Max', 'ActiveEnergy', 'ExerciseTime')"),
+      start: z.string().optional().describe("Start date (ISO 8601, e.g. '2024-01-01')"),
+      end: z.string().optional().describe("End date (ISO 8601, e.g. '2024-12-31')"),
+      source_id: z.string().default(SOURCE_ID).describe("Data source identifier"),
+    },
+    { title: "Get Trends", readOnlyHint: true, destructiveHint: false, openWorldHint: false },
+    async ({ metric, start, end, source_id }) => {
+      try {
+        const trends = db.getTrends(source_id, { metric, start, end });
+        if (!trends[metric]) {
+          return toolResult({ metric, days: [], hint: `No daily data found for '${metric}'. Call list_metrics to see available names.` });
+        }
+        const t = trends[metric];
+        return toolResult({ metric, unit: t.unit, count: t.days.length, days: t.days });
+      } catch (e) {
+        return toolError(`Failed to get trends: ${e.message}`);
       }
     }
   );

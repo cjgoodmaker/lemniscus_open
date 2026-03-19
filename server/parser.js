@@ -130,6 +130,18 @@ const DURATION_TYPES = new Set([
   "HKCategoryTypeIdentifierMindfulSession",
 ]);
 
+// Apple Health SleepAnalysis value attribute → distinct short_name.
+// Separates envelope records (InBed, Asleep) from stage sub-records
+// (Core, Deep, REM) so daily aggregation doesn't double-count.
+const SLEEP_VALUE_MAP = {
+  "HKCategoryValueSleepAnalysisInBed": "SleepInBed",
+  "HKCategoryValueSleepAnalysisAsleepUnspecified": "SleepAsleep",
+  "HKCategoryValueSleepAnalysisAwake": "SleepAwake",
+  "HKCategoryValueSleepAnalysisAsleepCore": "SleepCore",
+  "HKCategoryValueSleepAnalysisAsleepDeep": "SleepDeep",
+  "HKCategoryValueSleepAnalysisAsleepREM": "SleepREM",
+};
+
 // Prefixes to strip when auto-deriving short names for unknown types
 const TYPE_PREFIXES = [
   "HKQuantityTypeIdentifier",
@@ -219,10 +231,19 @@ function streamRawReadings(filePath, sourceId) {
 
       // Look up known type or auto-derive
       const typeInfo = HEALTH_TYPE_MAP[hkType] || deriveTypeInfo(hkType);
-      const [modality, shortName] = typeInfo;
+      let [modality, shortName] = typeInfo;
       const value = parseValue(node.attributes.value);
       const unit = node.attributes.unit || "";
       const end = parseTimestamp(node.attributes.endDate);
+
+      // Split sleep records into distinct metrics by stage.
+      // Apple Health exports envelope records (InBed, Asleep) that span the
+      // full session AND stage-level sub-records (Core, Deep, REM) that nest
+      // within them. Without splitting, daily SUM double-counts everything.
+      if (hkType === "HKCategoryTypeIdentifierSleepAnalysis") {
+        const sleepName = SLEEP_VALUE_MAP[node.attributes.value] || "SleepOther";
+        shortName = sleepName;
+      }
 
       if (DURATION_TYPES.has(hkType) && start && end) {
         const durationMin = Math.round(((end - start) / 60000) * 10) / 10;

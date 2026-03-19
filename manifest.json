@@ -57,6 +57,10 @@
       "description": "Get individual raw readings filtered by metric and date range (up to 5000)"
     },
     {
+      "name": "get_trends",
+      "description": "Rolling trends for a metric — 7/30-day moving averages, slope, and coefficient of variation"
+    },
+    {
       "name": "reindex",
       "description": "Re-scan data folder and index new Apple Health exports"
     }
