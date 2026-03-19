@@ -430,7 +430,7 @@
         </div>
         <div class="feature-cell">
           <h3>Lightweight</h3>
-          <p>~40 MB extension. No vector search, no AI models, no heavy dependencies. Just structured queries over your data.</p>
+          <p>~8 MB extension. No vector search, no AI models, no heavy dependencies. Just structured queries over your data.</p>
         </div>
       </div>
     </div>
@@ -512,7 +512,7 @@
         <div class="install-card">
           <span class="tag easy">Easiest</span>
           <h3>Claude Desktop Extension</h3>
-          <p>Download the extension file and drag it into Claude Desktop. No terminal needed.</p>
+          <p>Download the pre-built extension (~8 MB) &mdash; no cloning, no terminal, no dependencies.</p>
           <ol>
             <li>Download <a href="https://github.com/cjgoodmaker/lemniscus_open/releases">lemniscus.mcpb</a> from Releases</li>
             <li>Open Claude Desktop &rarr; Settings &rarr; Extensions</li>
@@ -521,10 +521,10 @@
           </ol>
         </div>
         <div class="install-card">
-          <span class="tag dev">Developer</span>
+          <span class="tag dev">From Source</span>
           <h3>Claude Code (CLI)</h3>
-          <p>Clone the repo and run with Claude Code for a developer-friendly workflow.</p>
-          <code>git clone https://github.com/cjgoodmaker/lemniscus_open.git<br>cd lemniscus_open && bash setup.sh</code>
+          <p>Clone the repo if you want to modify the server or use it with Claude Code.</p>
+          <code>git clone https://github.com/cjgoodmaker/lemniscus_open.git<br>cd lemniscus_open/server && npm install</code>
           <ol>
             <li>Copy your <code>export.xml</code> into <code>data/</code></li>
             <li>Run <code>claude</code> &mdash; MCP connects automatically</li>

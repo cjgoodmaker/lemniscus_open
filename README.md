@@ -6,18 +6,22 @@ A local MCP server that lets Claude query your Apple Health data. Export from yo
 
 ## Install
 
-### Option A: Claude Desktop Extension (easiest)
+### Option A: Claude Desktop Extension
 
-1. Download `lemniscus.mcpb` from [Releases](https://github.com/cjgoodmaker/lemniscus_open/releases)
+Download the pre-built extension — no cloning, no terminal, no dependencies.
+
+1. Download `lemniscus.mcpb` (~8 MB) from [Releases](https://github.com/cjgoodmaker/lemniscus_open/releases)
 2. Open Claude Desktop → Settings → Extensions
 3. Drag the file in and select your folder containing `export.xml`
 4. Start chatting
 
-### Option B: Claude Code (developer)
+### Option B: From source (Claude Code)
+
+Clone the repo if you want to modify the server or use it with Claude Code.
 
 ```bash
 git clone https://github.com/cjgoodmaker/lemniscus_open.git
-cd lemniscus_open && bash setup.sh
+cd lemniscus_open/server && npm install
 ```
 
 Copy your `export.xml` into `data/`, then run `claude`. The MCP server connects automatically via `.mcp.json`.
